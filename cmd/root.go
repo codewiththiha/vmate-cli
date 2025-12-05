@@ -1,103 +1,102 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
 	"vmate/lib/fileUtil"
 	"vmate/lib/vpn"
 
 	"github.com/spf13/cobra"
 )
 
-// TODO make flags actually usable
-// TODO use millisecond var for more fine grain control
-
 var (
-	dir string
-	// The limit usage should be limited ;) it only make sense to use if user's laptop has low ram and
-	// he's limited the max workers lower than 20, otherwise should be neglected
-	limit   int
-	timeout int
-	// TODO if the user specified workers exceed the total amount of configs handle that
+	dir        string
+	limit      int
+	timeout    int
 	maxworkers int
-
-	verbose bool
+	verbose    bool
 )
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "vmate",
 	Short: "VPN config tester",
 	Long:  `Test OpenVPN configurations from a directory with timeout and verbose options.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		//// You can see the ensureRootPrivileges function restart the process and double call
-		////  with following print func if you want to
-
-		// fmt.Println(verbose)
-		// Your original logic goes here, now using flags
 
 		expandedPath, _ := expandPath(dir)
-
-		ensureRootPrivileges(expandedPath, verbose, maxworkers)
+		ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout)
 
 		paths, err := fileUtil.GetConfigs(expandedPath)
+		if err != nil {
+			fmt.Println("Error reading configs:", err)
+			return
+		}
+
 		if maxworkers > len(paths) {
 			maxworkers = len(paths)
-			fmt.Println("Since your specified amount is smaller than the configs to test your maxworkers is set to", maxworkers)
 		}
-		circle := float64(len(paths)) / float64(maxworkers)
-		fmt.Println(len(paths), "/", maxworkers, int(math.Round(circle)))
 
-		// +1 to exceed the progress bar or just make progress bar -1
-		// this seem to be wrong in someway
-		// ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout*int(math.Round(circle)))*time.Second)
+		// 1. Setup Signal Handling (Ctrl+C)
+		// We create a context that gets canceled when Ctrl+C is pressed
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
 
-		if err != nil {
-			fmt.Println("can't get the paths")
-		}
+		// Safety net: Force kill openvpn on exit
+		defer exec.Command("killall", "openvpn", "-9").Run()
+
+		// 2. Setup Progress Bar Channel
+		// This channel receives a '1' every time a single test finishes
+		progressChan := make(chan int, len(paths))
 
 		if !verbose {
-			go progressBar(timeout * int(math.Round(circle)))
+			fmt.Printf("Testing %d configs with %d workers (Limit: %d success)\n", len(paths), maxworkers, limit)
+			// Start the visual progress bar in a separate goroutine
+			go runProgressBar(len(paths), progressChan)
 		}
 
-		// Handle Ctrl+C
-		sigChan := make(chan os.Signal, 1)
-		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+		// 3. Run the Tests
+		// We pass the signal context 'ctx'. RunTest handles the 'limit' logic internally.
+		succeedConfigs := vpn.RunTest(ctx, paths, verbose, maxworkers, limit, timeout, progressChan)
 
-		go func() {
-			// This mf will keep waitinig and get stucked
-			<-sigChan
-			fmt.Println("Force Exit Detected")
-			// I have to reconsider this will this even okay??
-			exec.Command("killall", "openvpn", "-9").Run()
+		// Close channel to ensure progress bar stops if it hasn't finished
+		close(progressChan)
 
-			// cancel() // Signal all goroutines to stop
-
-		}()
-
-		succeedConfigs := vpn.RunTest(paths, verbose, maxworkers)
-		fmt.Println("Final Result")
+		// 4. Output Results
+		fmt.Println("\n\n--- Final Result ---")
 		for _, config := range succeedConfigs {
-			fmt.Println(config.Path, "--", config.Country)
+			fmt.Printf("%s -- %s\n", config.Path, config.Country)
 		}
-
-		fmt.Println(len(succeedConfigs), "/", len(paths))
-		// to make sure
-		defer exec.Command("killall", "openvpn", "-9").Run()
-		// defer cancel()
-
+		fmt.Printf("Found: %d / Scanned: %d\n", len(succeedConfigs), len(paths))
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Real Progress Bar based on actual completed tasks
+func runProgressBar(total int, updates <-chan int) {
+	current := 0
+	for range updates {
+		current++
+		percent := float64(current) / float64(total) * 100
+
+		// Create a bar like [#####     ]
+		barLen := 20
+		filled := int((float64(current) / float64(total)) * float64(barLen))
+		bar := strings.Repeat("#", filled) + strings.Repeat("-", barLen-filled)
+
+		fmt.Printf("\r[%s] %.1f%% (%d/%d)", bar, percent, current, total)
+
+		if current == total {
+			break
+		}
+	}
+	fmt.Print("\n")
+}
+
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -106,36 +105,23 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.vmate.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Version = "beta-0.0.1"
+	rootCmd.Version = "beta-0.0.1b"
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", "~/", "The ovpn files' dir")
 	rootCmd.PersistentFlags().IntVarP(&limit, "limit", "l", 100, "Limit the amount of succeed ovpn to find")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "To get more output")
-	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 15, "The time given to the test processs")
-	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 15, "The max processes allowed per session")
-
+	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 15, "The time given to each test process")
+	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 200, "The max processes allowed per session")
 }
 
-// to get the root permission for our app
-func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int) {
+func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int) {
 	if os.Getuid() == 0 {
-		return // Already root, nothing to do
+		return
 	}
-
 	exe, err := os.Executable()
 	if err != nil {
 		fmt.Println("Error getting executable path")
 		os.Exit(1)
 	}
-
-	// So basically we extract actual user dir before passing it to this funtion so this expandedDir will be actual user home dir (;D sorry i'm using feyman method here)
 	args := []string{exe}
 	if expandedDir != "" {
 		args = append(args, "--dir", expandedDir)
@@ -143,9 +129,16 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int) {
 	if verbose {
 		args = append(args, "--verbose", "true")
 	}
-	// because default is 15 we don't need to change for that condition right!
-	if maxworkers != 15 {
+	// Pass flags back to sudo call
+	if maxworkers != 200 {
 		args = append(args, "--max", strconv.Itoa(maxworkers))
+	}
+	// Also pass limit and timeout if they are not default
+	if limit != 100 {
+		args = append(args, "--limit", strconv.Itoa(limit))
+	}
+	if timeout != 15 {
+		args = append(args, "--timeout", strconv.Itoa(timeout))
 	}
 
 	cmd := exec.Command("sudo", args...)
@@ -160,41 +153,16 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int) {
 		}
 		os.Exit(1)
 	}
-
-	// If it get the permission it will exit and will restart back with the permission
-	// So bassically Exit(0) mean restructing :D
 	os.Exit(0)
 }
 
-// this happened before the root permissions so we got actual home , without this we will get root/ which is not what we wanted
 func expandPath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
 			return "", fmt.Errorf("could not get home directory: %w", err)
 		}
-
-		return string(homeDir), nil
+		return strings.Replace(path, "~", homeDir, 1), nil
 	}
 	return path, nil
-}
-
-func progressBar(max int) {
-	for i := 0; i <= 100; i += 10 {
-		// eg 15 becomes 1500
-		time.Sleep(time.Duration(max*100) * time.Millisecond)
-
-		// Construct a simple progress bar string (e.g., "[##########] 50%")
-		barLength := i / 10
-		bar := "[" + strings.Repeat("#", barLength) + strings.Repeat(" ", 10-barLength) + "]"
-
-		// Use \r (carriage return) to move the cursor to the start of the line
-		// and overwrite the previous output.
-		// Use fmt.Printf instead of fmt.Println to avoid a newline.
-		fmt.Printf("\rProgress: %s %d%%", bar, i)
-	}
-
-	// After the loop finishes (at 100%), print a final newline
-	// so the next prompt or output appears on a new line.
-	fmt.Println("\nAlmost there!!")
 }

@@ -70,6 +70,7 @@ func GetLocation(dir string) string {
 	resp, err := client.Get(url)
 	if err != nil {
 		fmt.Println("Can't fetch the response")
+		return "UNKNOWN"
 	}
 	if resp.StatusCode != 200 {
 		return "ERR_API"
