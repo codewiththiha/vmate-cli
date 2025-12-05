@@ -1,14 +1,14 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
-	"context"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
+	"os/signal"
+	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"vmate/lib/fileUtil"
 	"vmate/lib/vpn"
@@ -16,9 +16,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// TODO make flags actually usable
+// TODO use millisecond var for more fine grain control
+
 var (
-	dir     string
+	dir string
+	// The limit usage should be limited ;) it only make sense to use if user's laptop has low ram and
+	// he's limited the max workers lower than 20, otherwise should be neglected
 	limit   int
+	timeout int
+	// TODO if the user specified workers exceed the total amount of configs handle that
+	maxworkers int
+
 	verbose bool
 )
 
@@ -28,23 +37,61 @@ var rootCmd = &cobra.Command{
 	Short: "VPN config tester",
 	Long:  `Test OpenVPN configurations from a directory with timeout and verbose options.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		//// You can see the ensureRootPrivileges function restart the process and double call
+		////  with following print func if you want to
 
+		// fmt.Println(verbose)
 		// Your original logic goes here, now using flags
+
 		expandedPath, _ := expandPath(dir)
-		ensureRootPrivileges(expandedPath)
-		ctx, cancel := context.WithTimeout(context.Background(), 16*time.Second)
-		fmt.Println(expandedPath)
+
+		ensureRootPrivileges(expandedPath, verbose, maxworkers)
+
 		paths, err := fileUtil.GetConfigs(expandedPath)
-		fmt.Println(len(paths))
+		if maxworkers > len(paths) {
+			maxworkers = len(paths)
+			fmt.Println("Since your specified amount is smaller than the configs to test your maxworkers is set to", maxworkers)
+		}
+		circle := float64(len(paths)) / float64(maxworkers)
+		fmt.Println(len(paths), "/", maxworkers, int(math.Round(circle)))
+
+		// +1 to exceed the progress bar or just make progress bar -1
+		// this seem to be wrong in someway
+		// ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout*int(math.Round(circle)))*time.Second)
+
 		if err != nil {
 			fmt.Println("can't get the paths")
 		}
-		succeedConfigs := vpn.RunTest(paths, ctx, cancel)
+
+		if !verbose {
+			go progressBar(timeout * int(math.Round(circle)))
+		}
+
+		// Handle Ctrl+C
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+		go func() {
+			// This mf will keep waitinig and get stucked
+			<-sigChan
+			fmt.Println("Force Exit Detected")
+			// I have to reconsider this will this even okay??
+			exec.Command("killall", "openvpn", "-9").Run()
+
+			// cancel() // Signal all goroutines to stop
+
+		}()
+
+		succeedConfigs := vpn.RunTest(paths, verbose, maxworkers)
+		fmt.Println("Final Result")
 		for _, config := range succeedConfigs {
 			fmt.Println(config.Path, "--", config.Country)
 		}
+
 		fmt.Println(len(succeedConfigs), "/", len(paths))
-		defer cancel()
+		// to make sure
+		defer exec.Command("killall", "openvpn", "-9").Run()
+		// defer cancel()
 
 	},
 }
@@ -67,15 +114,17 @@ func init() {
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Version = "beta-0.0.1"
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", "~/", "The ovpn files' dir")
 	rootCmd.PersistentFlags().IntVarP(&limit, "limit", "l", 100, "Limit the amount of succeed ovpn to find")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "To get more output")
+	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 15, "The time given to the test processs")
+	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 15, "The max processes allowed per session")
 
 }
 
 // to get the root permission for our app
-func ensureRootPrivileges(expandedDir string) {
+func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int) {
 	if os.Getuid() == 0 {
 		return // Already root, nothing to do
 	}
@@ -90,6 +139,13 @@ func ensureRootPrivileges(expandedDir string) {
 	args := []string{exe}
 	if expandedDir != "" {
 		args = append(args, "--dir", expandedDir)
+	}
+	if verbose {
+		args = append(args, "--verbose", "true")
+	}
+	// because default is 15 we don't need to change for that condition right!
+	if maxworkers != 15 {
+		args = append(args, "--max", strconv.Itoa(maxworkers))
 	}
 
 	cmd := exec.Command("sudo", args...)
@@ -121,4 +177,24 @@ func expandPath(path string) (string, error) {
 		return string(homeDir), nil
 	}
 	return path, nil
+}
+
+func progressBar(max int) {
+	for i := 0; i <= 100; i += 10 {
+		// eg 15 becomes 1500
+		time.Sleep(time.Duration(max*100) * time.Millisecond)
+
+		// Construct a simple progress bar string (e.g., "[##########] 50%")
+		barLength := i / 10
+		bar := "[" + strings.Repeat("#", barLength) + strings.Repeat(" ", 10-barLength) + "]"
+
+		// Use \r (carriage return) to move the cursor to the start of the line
+		// and overwrite the previous output.
+		// Use fmt.Printf instead of fmt.Println to avoid a newline.
+		fmt.Printf("\rProgress: %s %d%%", bar, i)
+	}
+
+	// After the loop finishes (at 100%), print a final newline
+	// so the next prompt or output appears on a new line.
+	fmt.Println("\nAlmost there!!")
 }
