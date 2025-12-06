@@ -22,6 +22,7 @@ var (
 	maxworkers int
 	verbose    bool
 	recent     bool
+	modify     bool
 )
 
 var rootCmd = &cobra.Command{
@@ -29,20 +30,35 @@ var rootCmd = &cobra.Command{
 	Short: "VPN config tester",
 	Long:  `Test OpenVPN configurations from a directory with timeout and verbose options.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// If you confused why recent flag isn't in the ensureRootPrivileges then we just run this function
+		//  above the ensureRootPrivileges so the double call doesn't happens and we don't need this
+		//  to pass recent as parameter
 		if recent {
-			vpns := fileUtil.OpenText()
+			if checkIncompatibleFlags("recent") {
+				return
+			}
+			vpns, err := fileUtil.OpenText()
+			if err != nil {
+				return
+			}
 			fmt.Println("Here're your previously succeed configs")
 			fmt.Println("--------------------------------------")
 			for _, vpn := range vpns {
-				fmt.Println(vpn.Country + " -- " + vpn.Path)
+				fmt.Println(vpn.Path + " -- " + vpn.Country)
 			}
 			return
 		}
 
 		expandedPath, _ := expandPath(dir)
-		ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout)
+		ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout, modify)
 
 		paths, err := fileUtil.GetConfigs(expandedPath)
+
+		if modify {
+			fmt.Println("Modifying!!")
+			fileUtil.ModifyConfigs(paths)
+		}
+
 		if err != nil {
 			fmt.Println("Error reading configs:", err)
 			return
@@ -129,9 +145,10 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 15, "The time given to each test process")
 	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 200, "The max processes allowed per session")
 	rootCmd.PersistentFlags().BoolVarP(&recent, "recent", "r", false, "To access the recent")
+	rootCmd.PersistentFlags().BoolVarP(&modify, "modify", "", false, "To modify wrong cipher of the configs")
 }
 
-func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int) {
+func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int, modify bool) {
 	if os.Getuid() == 0 {
 		return
 	}
@@ -158,6 +175,9 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limi
 	if timeout != 15 {
 		args = append(args, "--timeout", strconv.Itoa(timeout))
 	}
+	if modify {
+		args = append(args, "--modify", "true")
+	}
 
 	cmd := exec.Command("sudo", args...)
 	cmd.Stdin = os.Stdin
@@ -183,4 +203,57 @@ func expandPath(path string) (string, error) {
 		return strings.Replace(path, "~", homeDir, 1), nil
 	}
 	return path, nil
+}
+
+func checkIncompatibleFlags(current string) bool {
+	//// I'm obesed with minimal shorter codes so in this case I have to spam if states multiple times so i tried to shorten it
+	// totalFlags := 0
+	// if dir != "~/" {
+	// 	totalFlags++
+	// }
+	// if verbose {
+	// 	totalFlags++
+	// }
+	// // Pass flags back to sudo call
+	// if maxworkers != 200 {
+	// 	totalFlags++
+	// }
+	// // Also pass limit and timeout if they are not default
+	// if limit != 100 {
+	// 	totalFlags++
+	// }
+	// if timeout != 15 {
+	// 	totalFlags++
+	// }
+
+	// if recent {
+	// 	totalFlags++
+	// }
+	// if totalFlags > 1 {
+	// 	fmt.Println("You can only use", current, "flag as a single flag")
+	// 	return true
+	// }
+	//// If the values ain't the default then we can know user pass other flags
+	//  if the user passed the default values then i don't know ;))
+	conditions := []bool{
+		dir != "~/",
+		verbose,
+		maxworkers != 200,
+		limit != 100,
+		timeout != 15,
+		recent,
+	}
+
+	totalFlags := 0
+	for _, active := range conditions {
+		if active {
+			totalFlags++
+		}
+	}
+
+	if totalFlags > 1 {
+		fmt.Println("You can only use", current, "flag as a single flag")
+		return true
+	}
+	return false
 }
