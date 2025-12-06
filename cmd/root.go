@@ -21,6 +21,7 @@ var (
 	timeout    int
 	maxworkers int
 	verbose    bool
+	recent     bool
 )
 
 var rootCmd = &cobra.Command{
@@ -28,6 +29,15 @@ var rootCmd = &cobra.Command{
 	Short: "VPN config tester",
 	Long:  `Test OpenVPN configurations from a directory with timeout and verbose options.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		if recent {
+			vpns := fileUtil.OpenText()
+			fmt.Println("Here're your previously succeed configs")
+			fmt.Println("--------------------------------------")
+			for _, vpn := range vpns {
+				fmt.Println(vpn.Country + " -- " + vpn.Path)
+			}
+			return
+		}
 
 		expandedPath, _ := expandPath(dir)
 		ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout)
@@ -73,6 +83,13 @@ var rootCmd = &cobra.Command{
 			fmt.Printf("%s -- %s\n", config.Path, config.Country)
 		}
 		fmt.Printf("Found: %d / Scanned: %d\n", len(succeedConfigs), len(paths))
+		status, err := fileUtil.SaveAsText(succeedConfigs)
+		if err != nil {
+			fmt.Println("Can't create the file")
+		}
+		if status {
+			fmt.Println("Saved to your history access via --recent or -r flag")
+		}
 	},
 }
 
@@ -111,6 +128,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "To get more output")
 	rootCmd.PersistentFlags().IntVarP(&timeout, "timeout", "t", 15, "The time given to each test process")
 	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 200, "The max processes allowed per session")
+	rootCmd.PersistentFlags().BoolVarP(&recent, "recent", "r", false, "To access the recent")
 }
 
 func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int) {
