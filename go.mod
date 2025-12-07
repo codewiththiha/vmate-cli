@@ -1,4 +1,4 @@
-module vmate
+module github.com/codewiththiha/vmate-cli
 
 go 1.25.1
 

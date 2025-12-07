@@ -11,9 +11,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
-	"vmate/lib/fileUtil"
-	"vmate/lib/network"
-	"vmate/lib/vpn"
+
+	"github.com/codewiththiha/vmate-cli/lib/fileUtil"
+	"github.com/codewiththiha/vmate-cli/lib/network"
+	"github.com/codewiththiha/vmate-cli/lib/vpn"
 
 	"github.com/spf13/cobra"
 )

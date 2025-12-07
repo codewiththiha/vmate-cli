@@ -3,7 +3,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "vmate/cmd"
+import "github.com/codewiththiha/vmate-cli/cmd"
 
 func main() {
 

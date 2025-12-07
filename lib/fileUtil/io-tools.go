@@ -8,7 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"vmate/lib/vpn"
+
+	"github.com/codewiththiha/vmate-cli/lib/vpn"
 )
 
 const (

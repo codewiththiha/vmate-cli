@@ -9,7 +9,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"vmate/lib/network"
+
+	"github.com/codewiththiha/vmate-cli/lib/network"
 )
 
 // TODO if stuck at "Initial packet from" should wait
