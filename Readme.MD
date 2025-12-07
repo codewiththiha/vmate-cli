@@ -17,13 +17,16 @@ The more system resources you have (especially RAM), the better the performance 
 
 ## ✨ Features
 
-- 🔍 **Automatic Discovery**: Scans specified directories for .ovpn files
+- 🔍 **Automatic Discovery**: Scans specified directories recursively for .ovpn files
 - ⚡ **Concurrent Testing**: Uses goroutines to test multiple configs simultaneously
 - ⏱️ **Configurable Timeout**: Set custom timeouts for each connection test
 - 🎯 **Result Limiting**: Control how many working configs to find
 - 🔧 **Verbose Mode**: Get detailed output for debugging
 - 📊 **Worker Pool Management**: Control concurrency levels to match your system
-- 📊 **smart connect**: watch and manage the connections smartly
+- 🔄 **Smart Connect**: Connect to a specific config with auto-reconnection and failover
+- 📜 **Recent History**: View and reuse previously successful configs
+- ✏️ **Config Modifier**: Automatically fix outdated cipher settings in .ovpn files
+- 📈 **Progress Visualization**: Real-time progress bar showing test status
 
 ## 📦 Installation
 
@@ -42,6 +45,49 @@ go build -o vmate-cli main.go
 sudo mv vmate-cli /usr/local/bin/
 ```
 
+### Install with Go (Recommended)
+
+```bash
+go install github.com/codewiththiha/vmate-cli@latest
+```
+
+**Note**: Ensure your `GOPATH/bin` (usually `~/go/bin`) is in your system's PATH:
+
+```bash
+export PATH=$PATH:$(go env GOPATH)/bin
+```
+
+#### Troubleshooting `go install` Issues
+
+If you encounter version conflicts or caching issues:
+
+**1. Bypass the Go Module Proxy:**
+
+```bash
+GOPROXY=direct go install github.com/codewiththiha/vmate-cli@latest
+```
+
+**2. Install a Specific Commit:**
+
+```bash
+# Get the latest commit hash
+git ls-remote https://github.com/codewiththiha/vmate-cli.git HEAD
+
+# Then install using that commit
+go install github.com/codewiththiha/vmate-cli@<commit-hash>
+```
+
+**3. Install from Local Clone:**
+
+```bash
+git clone https://github.com/codewiththiha/vmate-cli.git
+cd vmate-cli
+go install .
+sudo mv $(go env GOPATH)/bin/vmate-cli /usr/local/bin/
+```
+
+**Why these issues happen**: The Go module proxy caches versions for performance, and it can take 30-60 minutes to recognize new commits.
+
 ## 🎯 Usage
 
 ```bash
@@ -53,6 +99,15 @@ sudo vmate-cli --dir=/path/to/ovpn/files --limit=50 --timeout=10 --max=20
 
 # Get detailed output
 sudo vmate-cli --verbose --dir=~/vpn-configs
+
+# View previously successful configs
+sudo vmate-cli --recent
+
+# Connect to a specific config with smart failover
+sudo vmate-cli --connect=/path/to/config.ovpn
+
+# Fix outdated cipher settings in all configs
+sudo vmate-cli --dir=/path/to/ovpn/files --modify
 ```
 
 ### Command Line Flags
@@ -62,31 +117,52 @@ Flags:
   -d, --dir string      Directory containing .ovpn files (default "~/")
   -h, --help            Help for vmate
   -l, --limit int       Maximum number of working configs to find (default 100)
-  -m, --max int         Maximum concurrent worker processes (default 15)
+  -m, --max int         Maximum concurrent worker processes (default 200)
   -t, --timeout int     Timeout in seconds for each connection test (default 15)
       --verbose         Enable detailed output for debugging
+  -r, --recent          Display recently successful configs from history
+      --modify          Fix outdated cipher settings in .ovpn files
+  -c, --connect string  Connect to a specific config with smart reconnection
 ```
+
+### Flag Compatibility Notes
+
+- `--recent` must be used alone (incompatible with other operational flags)
+- `--connect` can be combined with `--verbose` but not other flags
+- The tool automatically re-executes with sudo if not run as root
 
 ## 🛠️ Configuration
 
-Vmate automatically respects your system's OpenVPN capabilities. No additional configuration files are needed.
+Vmate automatically respects your system's OpenVPN capabilities. Configuration history is stored in `recent.txt` in the current directory.
 
 ### Important Notes
 
-- Always run with `sudo` - OpenVPN requires elevated privileges(or it will ask itself)
-- Adjust `--max` based on your system's RAM (higher = faster but more memory usage)
-- Use `--timeout` to balance speed vs. thoroughness (lower = faster, but might miss slow servers)
-- Set `--limit` to 0 for unlimited results
+- **Always run with `sudo`** - OpenVPN requires elevated privileges (or it will prompt itself)
+- **Adjust `--max` based on your system's RAM** (higher = faster but more memory usage)
+- **Use `--timeout` to balance speed vs. thoroughness** (lower = faster, but might miss slow servers)
+- **Set `--limit` to 0 for unlimited results**
+- **Recent history** is saved after each successful scan and persists across sessions
+
+### Config Modifier
+
+The `--modify` flag automatically updates outdated cipher configurations:
+
+- Replaces `cipher AES-128-CBC` with modern `data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305:AES-128-CBC`
+- Marks modified files with `#MODIFIED` header to prevent duplicate changes
+- Only processes files that haven't been modified already
 
 ## 🗺️ Roadmap
 
 - [x] Core CLI functionality
 - [x] Concurrent processing with worker pools
+- [x] Smart connection management with auto-reconnection
+- [x] Recent history tracking
+- [x] Config modifier for outdated ciphers
 - [ ] **GUI version** - Currently in development using [Wails](https://wails.io/)
 
 ## 🤝 Contributing
 
-This project is in beta. Basic functions are stable and usable. Contributions are welcome!
+This project is in beta (v0.0.2a). Basic functions are stable and usable. Contributions are welcome! Please ensure all CLI flags are documented when adding new features.
 
 ## 💭 Feedback
 
@@ -100,4 +176,4 @@ Found a working config that Vmate missed? Open an issue with the details. Perfor
 
 ---
 
-**⚠️ Beta Notice**: This tool is currently in beta. While core functionality is stable, please report any issues you encounter.
+**⚠️ Beta Notice**: This tool is currently in beta (v0.0.2a). While core functionality is stable, please report any issues you encounter.
