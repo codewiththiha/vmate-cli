@@ -12,6 +12,9 @@ import (
 	"vmate/lib/network"
 )
 
+// TODO if stuck at "Initial packet from" should wait
+// nah change the concept if it stuck at certain situation will skip it in a while but for the other conditions let
+
 var ErrorKeywords = []string{
 	"No route to host",
 	"TLS key negotiation failed",
@@ -31,6 +34,7 @@ var ErrorKeywords = []string{
 	"handshake failure",
 	"fatal error",
 	"process exiting",
+	"killed",
 }
 
 func getArgs(fun string, filePath string) []string {
@@ -193,4 +197,68 @@ LOOP:
 
 	wg.Wait()
 	return succeedConfigs
+}
+
+// This function will complain the restart errors
+// add verbose
+func ConnectAndMonitor(ctx context.Context, configPath string, c string, preconnect *bool, verbose bool) error {
+	cmd := exec.CommandContext(ctx, "openvpn", "--config", configPath)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	stdPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		fmt.Println("Can't read the output")
+		return err
+	}
+	cmd.Stderr = cmd.Stdout
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+
+	errorChannel := make(chan error, 1)
+
+	go func(config string) {
+		// var connected bool
+		scanner := bufio.NewScanner(stdPipe)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if strings.Contains(line, "Initialization Sequence Completed") {
+				// connected = true
+				// if succeed after second times then reconnect should be try again so false
+				*preconnect = false
+				fmt.Println("Connected successfully to", c)
+				// continue
+			}
+
+			if strings.Contains(line, "Restart pause") {
+				errorChannel <- fmt.Errorf("restart detected")
+				return
+			}
+
+			for _, keyword := range ErrorKeywords {
+				if strings.Contains(line, keyword) {
+
+					errorChannel <- fmt.Errorf("restart detected")
+					return
+				}
+			}
+
+			if verbose {
+				fmt.Println(line)
+			}
+		}
+
+	}(configPath)
+
+	select {
+	case err := <-errorChannel:
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return err
+	case <-ctx.Done():
+		// User pressed Ctrl+C
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return nil // No error, just normal exit
+
+	}
+
 }

@@ -6,10 +6,13 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
 	"vmate/lib/fileUtil"
+	"vmate/lib/network"
 	"vmate/lib/vpn"
 
 	"github.com/spf13/cobra"
@@ -23,6 +26,7 @@ var (
 	verbose    bool
 	recent     bool
 	modify     bool
+	connect    string
 )
 
 var rootCmd = &cobra.Command{
@@ -34,7 +38,7 @@ var rootCmd = &cobra.Command{
 		//  above the ensureRootPrivileges so the double call doesn't happens and we don't need this
 		//  to pass recent as parameter
 		if recent {
-			if checkIncompatibleFlags("recent") {
+			if checkIncompatibleFlags("recent", false) {
 				return
 			}
 			vpns, err := fileUtil.OpenText()
@@ -49,8 +53,90 @@ var rootCmd = &cobra.Command{
 			return
 		}
 
+		if connect != "" {
+			expandedPath, _ := expandPath(dir)
+			reconnect := false
+			Proconnect := &reconnect
+			if checkIncompatibleFlags("connect", true) {
+				return
+			}
+			ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout, modify, connect)
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+			defer exec.Command("killall", "openvpn", "-9").Run()
+			loopcount := 0
+			currentConfig := connect
+			pCurrentConfig := &currentConfig
+			for {
+				// debug purpose
+				loopcount++
+				fmt.Println("connecting:", loopcount, filepath.Base(currentConfig))
+
+				// should format to path and unknown country vpn.VPN type so if we used from recent there's already country and we can skip
+
+				c := network.GetLocation(currentConfig)
+				err := vpn.ConnectAndMonitor(ctx, currentConfig, c, Proconnect, verbose)
+				if ctx.Err() != nil {
+					fmt.Println("User Exited!")
+					return
+				}
+				if err != nil {
+					fmt.Println("Reconnecting")
+					if !reconnect {
+						reconnect = true
+						exec.Command("killall", "openvpn", "-9").Run()
+						continue
+					}
+					// just need to add smart function that will automatically use a config from the recent if the retry on same config failed
+					// sometimes stuck at here  initial untrusted session promoted to trusted
+					// continue
+					if reconnect {
+						//// Not necessary
+						// exec.Command("killall", "openvpn", "-9").Run()
+						vpns, err := fileUtil.OpenText()
+						if err != nil {
+							return
+						}
+						failFiltered := slices.DeleteFunc(vpns, func(s vpn.VPN) bool {
+							return s.Path == strings.TrimSpace(currentConfig)
+						})
+						status, err := fileUtil.SaveAsText(failFiltered)
+						if err != nil {
+							fmt.Println("Save failed")
+							return
+						}
+						// this status from the saveastext function is unnecessary will remove later
+						if !status {
+							fmt.Println("Save failed")
+							return
+						}
+
+						if len(failFiltered) == 0 {
+							fmt.Println("There's so saved config in your recent")
+							return
+						}
+						if len(failFiltered) > 0 {
+							newConfig := failFiltered[1].Path
+							*pCurrentConfig = newConfig
+							fmt.Println("New Config inserted", filepath.Base(currentConfig))
+							continue
+						}
+					}
+					return
+				}
+			}
+
+		}
+
 		expandedPath, _ := expandPath(dir)
-		ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout, modify)
+		alreadyRoot := ensureRootPrivileges(expandedPath, verbose, maxworkers, limit, timeout, modify, connect)
+		if alreadyRoot {
+			if expandedPath == "/root/" {
+				fmt.Println("Avoid using vmate as root/sudo")
+				return
+			}
+
+		}
 
 		paths, err := fileUtil.GetConfigs(expandedPath)
 
@@ -117,7 +203,7 @@ func runProgressBar(total int, updates <-chan int) {
 		percent := float64(current) / float64(total) * 100
 
 		// Create a bar like [#####     ]
-		barLen := 20
+		barLen := 40
 		filled := int((float64(current) / float64(total)) * float64(barLen))
 		bar := strings.Repeat("#", filled) + strings.Repeat("-", barLen-filled)
 
@@ -138,7 +224,7 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.Version = "beta-0.0.1b"
+	rootCmd.Version = "beta-0.0.2a"
 	rootCmd.PersistentFlags().StringVarP(&dir, "dir", "d", "~/", "The ovpn files' dir")
 	rootCmd.PersistentFlags().IntVarP(&limit, "limit", "l", 100, "Limit the amount of succeed ovpn to find")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "", false, "To get more output")
@@ -146,11 +232,12 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&maxworkers, "max", "m", 200, "The max processes allowed per session")
 	rootCmd.PersistentFlags().BoolVarP(&recent, "recent", "r", false, "To access the recent")
 	rootCmd.PersistentFlags().BoolVarP(&modify, "modify", "", false, "To modify wrong cipher of the configs")
+	rootCmd.PersistentFlags().StringVarP(&connect, "connect", "c", "", "To connect to a config")
 }
 
-func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int, modify bool) {
+func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int, modify bool, connect string) bool {
 	if os.Getuid() == 0 {
-		return
+		return true
 	}
 	exe, err := os.Executable()
 	if err != nil {
@@ -178,6 +265,9 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limi
 	if modify {
 		args = append(args, "--modify", "true")
 	}
+	if connect != "" {
+		args = append(args, "--connect", connect)
+	}
 
 	cmd := exec.Command("sudo", args...)
 	cmd.Stdin = os.Stdin
@@ -192,6 +282,7 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limi
 		os.Exit(1)
 	}
 	os.Exit(0)
+	return false
 }
 
 func expandPath(path string) (string, error) {
@@ -205,7 +296,7 @@ func expandPath(path string) (string, error) {
 	return path, nil
 }
 
-func checkIncompatibleFlags(current string) bool {
+func checkIncompatibleFlags(current string, verboseAllow bool) bool {
 	//// I'm obesed with minimal shorter codes so in this case I have to spam if states multiple times so i tried to shorten it
 	// totalFlags := 0
 	// if dir != "~/" {
@@ -243,8 +334,14 @@ func checkIncompatibleFlags(current string) bool {
 		timeout != 15,
 		recent,
 	}
+	var totalFlags int
+	if verboseAllow && verbose {
+		// to able to pass the check
+		totalFlags = -1
+	} else {
+		totalFlags = 0
+	}
 
-	totalFlags := 0
 	for _, active := range conditions {
 		if active {
 			totalFlags++

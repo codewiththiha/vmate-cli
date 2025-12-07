@@ -23,6 +23,7 @@ The more system resources you have (especially RAM), the better the performance 
 - 🎯 **Result Limiting**: Control how many working configs to find
 - 🔧 **Verbose Mode**: Get detailed output for debugging
 - 📊 **Worker Pool Management**: Control concurrency levels to match your system
+- 📊 **smart connect**: watch and manage the connection smartly
 
 ## 📦 Installation
 
