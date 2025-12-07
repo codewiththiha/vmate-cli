@@ -70,12 +70,18 @@ var rootCmd = &cobra.Command{
 			for {
 				// debug purpose
 				loopcount++
-				fmt.Println("connecting:", loopcount, filepath.Base(currentConfig))
+				// fmt.Println("connecting:", loopcount, filepath.Base(currentConfig))
+				fmt.Println("connecting to:", filepath.Base(currentConfig))
+				// fmt.Println(reconnect)
+
+				///
 
 				// should format to path and unknown country vpn.VPN type so if we used from recent there's already country and we can skip
 
 				c := network.GetLocation(currentConfig)
+
 				err := vpn.ConnectAndMonitor(ctx, currentConfig, c, Proconnect, verbose)
+				fmt.Println(reconnect, "after getting back from func")
 				if ctx.Err() != nil {
 					fmt.Println("User Exited!")
 					return
@@ -83,18 +89,22 @@ var rootCmd = &cobra.Command{
 				if err != nil {
 					fmt.Println("Reconnecting")
 					if !reconnect {
+
 						reconnect = true
 						exec.Command("killall", "openvpn", "-9").Run()
 						continue
 					}
-					// just need to add smart function that will automatically use a config from the recent if the retry on same config failed
-					// sometimes stuck at here  initial untrusted session promoted to trusted
-					// continue
 					if reconnect {
+						fmt.Println("in the reconnect attempt")
+						reconnect = false
 						//// Not necessary
 						// exec.Command("killall", "openvpn", "-9").Run()
 						vpns, err := fileUtil.OpenText()
 						if err != nil {
+							return
+						}
+						if len(vpns) == 1 {
+							fmt.Println("There's so saved config in your recent")
 							return
 						}
 						failFiltered := slices.DeleteFunc(vpns, func(s vpn.VPN) bool {
@@ -122,6 +132,11 @@ var rootCmd = &cobra.Command{
 							continue
 						}
 					}
+
+					// just need to add smart function that will automatically use a config from the recent if the retry on same config failed
+					// sometimes stuck at here  initial untrusted session promoted to trusted
+					// continue
+
 					return
 				}
 			}

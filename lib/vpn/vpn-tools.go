@@ -202,12 +202,13 @@ LOOP:
 // This function will complain the restart errors
 // add verbose
 func ConnectAndMonitor(ctx context.Context, configPath string, c string, preconnect *bool, verbose bool) error {
+	// 1. Start command with PARENT context (ctx), not the timeout context.
+	// This ensures the process isn't auto-killed after 5 seconds.
 	cmd := exec.CommandContext(ctx, "openvpn", "--config", configPath)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	stdPipe, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Println("Can't read the output")
 		return err
 	}
 	cmd.Stderr = cmd.Stdout
@@ -215,50 +216,163 @@ func ConnectAndMonitor(ctx context.Context, configPath string, c string, preconn
 		return err
 	}
 
-	errorChannel := make(chan error, 1)
+	// Channels to signal status from the monitoring goroutine
+	successChan := make(chan bool, 1)
+	errorChan := make(chan error, 1)
 
-	go func(config string) {
-		// var connected bool
+	// Monitor Goroutine
+	go func() {
 		scanner := bufio.NewScanner(stdPipe)
+		isConnected := false
+
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
-			if strings.Contains(line, "Initialization Sequence Completed") {
-				// connected = true
-				// if succeed after second times then reconnect should be try again so false
-				*preconnect = false
-				fmt.Println("Connected successfully to", c)
-				// continue
+
+			// A. Check for Success
+			if !isConnected && strings.Contains(line, "Initialization Sequence Completed") {
+				isConnected = true
+				// Signal success non-blocking
+				select {
+				case successChan <- true:
+				default:
+				}
 			}
 
-			if strings.Contains(line, "Restart pause") {
-				errorChannel <- fmt.Errorf("restart detected")
-				return
-			}
-
+			// B. Check for Errors
 			for _, keyword := range ErrorKeywords {
 				if strings.Contains(line, keyword) {
-
-					errorChannel <- fmt.Errorf("restart detected")
+					errorChan <- fmt.Errorf("error keyword found: %s", keyword)
 					return
 				}
+			}
+			if strings.Contains(line, "Restart pause") {
+				errorChan <- fmt.Errorf("restart pause detected")
+				return
 			}
 
 			if verbose {
 				fmt.Println(line)
 			}
 		}
+		// If scanner exits (process died unexpectedly)
+		errorChan <- fmt.Errorf("process exited unexpectedly")
+	}()
 
-	}(configPath)
-
+	// --- PHASE 1: The Handshake (Strict 5s Limit) ---
 	select {
-	case err := <-errorChannel:
+	case <-successChan:
+		// SUCCESS! We connected within 5 seconds.
+		fmt.Println("Connected successfully to", c)
+		*preconnect = false
+		// DO NOT RETURN. We now proceed to Phase 2 to keep the connection alive.
+
+	case <-time.After(5 * time.Second):
+		// TIMEOUT! It took too long. Kill it.
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		*preconnect = true
+		return fmt.Errorf("connection timed out (exceeded 5s)")
+
+	case err := <-errorChan:
+		// ERROR! Immediate failure (Auth failed, etc.)
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		*preconnect = true
 		return err
+
 	case <-ctx.Done():
 		// User pressed Ctrl+C
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		return nil // No error, just normal exit
-
+		return nil
 	}
 
+	// --- PHASE 2: Monitoring (Indefinite "Maximized" Time) ---
+	// We only reach here if Phase 1 succeeded. Now we wait forever.
+	select {
+	case err := <-errorChan:
+		// The VPN crashed/disconnected LATER (after the first 5s)
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		*preconnect = false // Mark as failed so you can retry if desired
+		return err
+
+	case <-ctx.Done():
+		// User pressed Ctrl+C
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		return nil
+	}
 }
+
+//// Previous logic
+
+// func ConnectAndMonitor(ctx context.Context, configPath string, c string, preconnect *bool, verbose bool) error {
+// 	timeout := 5
+
+// 	sctx, stop := context.WithTimeout(ctx, time.Duration(timeout)*time.Second)
+// 	defer stop()
+
+// 	cmd := exec.CommandContext(sctx, "openvpn", "--config", configPath)
+// 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+// 	stdPipe, err := cmd.StdoutPipe()
+// 	if err != nil {
+// 		fmt.Println("Can't read the output")
+// 		return err
+// 	}
+// 	cmd.Stderr = cmd.Stdout
+// 	if err := cmd.Start(); err != nil {
+// 		return err
+// 	}
+
+// 	errorChannel := make(chan error, 1)
+
+// 	go func(config string) {
+// 		// var connected bool
+// 		*preconnect = false
+// 		scanner := bufio.NewScanner(stdPipe)
+// 		for scanner.Scan() {
+// 			line := strings.TrimSpace(scanner.Text())
+// 			if strings.Contains(line, "Initialization Sequence Completed") {
+// 				//////Want to maximize the timeout back to 3600 1 hr for the sctx
+
+// 				// connected = true
+// 				// if succeed after second times then reconnect should be try again so false
+// 				*preconnect = false
+// 				fmt.Println("Connected successfully to", c)
+// 				// continue
+// 			}
+
+// 			if strings.Contains(line, "Restart pause") {
+// 				errorChannel <- fmt.Errorf("restart detected")
+// 				return
+// 			}
+
+// 			for _, keyword := range ErrorKeywords {
+// 				if strings.Contains(line, keyword) {
+
+// 					errorChannel <- fmt.Errorf("restart detected")
+// 					return
+// 				}
+// 			}
+
+// 			if verbose {
+// 				fmt.Println(line)
+// 			}
+// 		}
+
+// 	}(configPath)
+
+// 	select {
+// 	case err := <-errorChannel:
+// 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+// 		return err
+// 	case <-ctx.Done():
+// 		// User pressed Ctrl+C
+// 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+// 		return nil // No error, just normal exit
+// 	case <-sctx.Done():
+// 		*preconnect = true
+// 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+// 		fmt.Println("returning err")
+// 		return err
+
+// 	}
+
+// }
