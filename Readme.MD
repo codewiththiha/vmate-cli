@@ -34,7 +34,7 @@ The more system resources you have (especially RAM), the better the performance 
 
 - Go 1.19+ (for building from source)
 - OpenVPN installed on your system
-- sudo access (required for OpenVPN testing)
+- Root/sudo access (required for OpenVPN testing - Vmate will prompt automatically)
 
 ### Build from Source
 
@@ -45,7 +45,7 @@ go build -o vmate-cli main.go
 sudo mv vmate-cli /usr/local/bin/
 ```
 
-### Install with Go (Recommended)
+### Install with Go
 
 ```bash
 go install github.com/codewiththiha/vmate-cli@latest
@@ -90,24 +90,26 @@ sudo mv $(go env GOPATH)/bin/vmate-cli /usr/local/bin/
 
 ## 🎯 Usage
 
+⚠️ **IMPORTANT**: Do NOT run Vmate with `sudo` manually. The tool automatically requests root privileges when needed.
+
 ```bash
 # Basic usage - scan default home directory
-sudo vmate-cli
+vmate-cli
 
 # Scan specific directory with custom settings
-sudo vmate-cli --dir=/path/to/ovpn/files --limit=50 --timeout=10 --max=20
+vmate-cli --dir=/path/to/ovpn/files --limit=50 --timeout=10 --max=20
 
 # Get detailed output
-sudo vmate-cli --verbose --dir=~/vpn-configs
+vmate-cli --verbose --dir=~/vpn-configs
 
 # View previously successful configs
-sudo vmate-cli --recent
+vmate-cli --recent
 
 # Connect to a specific config with smart failover
-sudo vmate-cli --connect=/path/to/config.ovpn
+vmate-cli --connect=/path/to/config.ovpn
 
 # Fix outdated cipher settings in all configs
-sudo vmate-cli --dir=/path/to/ovpn/files --modify
+vmate-cli --dir=/path/to/ovpn/files --modify
 ```
 
 ### Command Line Flags
@@ -137,7 +139,7 @@ Vmate automatically respects your system's OpenVPN capabilities. Configuration h
 
 ### Important Notes
 
-- **Always run with `sudo`** - OpenVPN requires elevated privileges (or it will prompt itself)
+- **⚠️ DO NOT run with `sudo` manually** - Vmate automatically requests root privileges when needed
 - **Adjust `--max` based on your system's RAM** (higher = faster but more memory usage)
 - **Use `--timeout` to balance speed vs. thoroughness** (lower = faster, but might miss slow servers)
 - **Set `--limit` to 0 for unlimited results**
