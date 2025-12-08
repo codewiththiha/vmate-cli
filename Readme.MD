@@ -179,3 +179,5 @@ Found a working config that Vmate missed? Open an issue with the details. Perfor
 ---
 
 **⚠️ Beta Notice**: This tool is currently in beta (v0.0.2a). While core functionality is stable, please report any issues you encounter.
+
+Demo: https://youtu.be/77tMUuJhO_8?si=HE7xvPa1EI3KvrtH
