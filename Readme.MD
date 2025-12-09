@@ -1,5 +1,7 @@
 # Vmate ⚡
 
+# Vmate only optimized well on configs from vpn gate
+
 Fast, concurrent OpenVPN configuration validator that automatically finds working .ovpn files from your specified directory.
 
 > **What it does**: Instead of manually testing each OpenVPN config file with `sudo openvpn --config`, Vmate automates the entire process, saving you hours of tedious work.
