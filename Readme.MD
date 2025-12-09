@@ -1,6 +1,6 @@
 # Vmate ⚡
 
-# Vmate only optimized well on configs from vpn gate
+## Note: Vmate only optimized well on configs from vpn gate
 
 Fast, concurrent OpenVPN configuration validator that automatically finds working .ovpn files from your specified directory.
 
