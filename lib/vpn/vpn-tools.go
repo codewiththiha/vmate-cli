@@ -127,20 +127,94 @@ type VPN struct {
 }
 
 // RunTest now accepts a Context (for Ctrl+C), a Progress Channel, and the timeout duration
+// func RunTest(ctx context.Context, paths []string, verbose bool, maxworkers int, limit int, timeout int, progressChan chan<- int) []VPN {
+// 	succeedConfigs := []VPN{}
+
+// 	// Create a cancelable context for the Limit logic.
+// 	// If limit is reached, we cancel this context to stop spawning new workers.
+// 	limitCtx, cancelLimit := context.WithCancel(ctx)
+// 	defer cancelLimit()
+
+// 	sem := make(chan struct{}, maxworkers)
+// 	var wg sync.WaitGroup
+// 	var mu sync.Mutex
+// LOOP:
+// 	for _, path := range paths {
+// 		// Check if we should stop starting new tests (Limit reached or Ctrl+C)
+// 		if limitCtx.Err() != nil {
+// 			break
+// 		}
+
+// 		wg.Add(1)
+
+// 		// Acquire worker slot
+// 		select {
+// 		case sem <- struct{}{}:
+// 		case <-limitCtx.Done():
+// 			wg.Done()
+// 			break LOOP
+// 		}
+
+// 		go func(p string) {
+// 			defer wg.Done()
+// 			defer func() { <-sem }() // Release worker slot
+
+// 			// Always send a signal to progress bar when done (success or fail)
+// 			if progressChan != nil {
+// 				defer func() { progressChan <- 1 }()
+// 			}
+
+// 			// Check context again before running heavy process
+// 			if limitCtx.Err() != nil {
+// 				return
+// 			}
+
+// 			if testVPN(limitCtx, p, timeout) {
+// 				mu.Lock()
+// 				// Double check limit inside lock to prevent race condition
+// 				if len(succeedConfigs) < limit {
+// 					c := network.GetLocation(p)
+// 					succeedConfigs = append(succeedConfigs, VPN{
+// 						Path:    p,
+// 						Country: c,
+// 					})
+// 					if verbose {
+// 						fmt.Printf("\n[SUCCESS] %s --- %s\n", p, c)
+// 					}
+
+// 					// If we hit the limit, stop everything
+// 					if len(succeedConfigs) >= limit {
+// 						cancelLimit()
+// 					}
+// 				}
+// 				mu.Unlock()
+// 			} else {
+// 				if verbose {
+// 					fmt.Printf("\n[FAILED] %s\n", p)
+// 				}
+// 			}
+// 		}(path)
+// 	}
+
+// 	wg.Wait()
+// 	return succeedConfigs
+// }
+
+// New Function that's also use go-routines for ipinfo fetching
 func RunTest(ctx context.Context, paths []string, verbose bool, maxworkers int, limit int, timeout int, progressChan chan<- int) []VPN {
 	succeedConfigs := []VPN{}
 
 	// Create a cancelable context for the Limit logic.
-	// If limit is reached, we cancel this context to stop spawning new workers.
 	limitCtx, cancelLimit := context.WithCancel(ctx)
 	defer cancelLimit()
 
 	sem := make(chan struct{}, maxworkers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+
 LOOP:
 	for _, path := range paths {
-		// Check if we should stop starting new tests (Limit reached or Ctrl+C)
+		// Check if we should stop starting new tests
 		if limitCtx.Err() != nil {
 			break
 		}
@@ -159,21 +233,36 @@ LOOP:
 			defer wg.Done()
 			defer func() { <-sem }() // Release worker slot
 
-			// Always send a signal to progress bar when done (success or fail)
+			// Always send a signal to progress bar when done
 			if progressChan != nil {
 				defer func() { progressChan <- 1 }()
 			}
 
-			// Check context again before running heavy process
 			if limitCtx.Err() != nil {
 				return
 			}
 
+			// 1. Run the VPN Test (Respects Timeout)
 			if testVPN(limitCtx, p, timeout) {
+
+				// 2. Optimization: Check limit *before* doing the expensive API call.
+				// We use a read-lock or just a quick check. It's okay if it's slightly "loose"
+				// to avoid blocking, but strictly we should lock.
 				mu.Lock()
-				// Double check limit inside lock to prevent race condition
+				if len(succeedConfigs) >= limit {
+					mu.Unlock()
+					cancelLimit() // Stop others
+					return
+				}
+				mu.Unlock()
+
+				// 3. FETCH LOCATION CONCURRENTLY (Outside the lock!)
+				// This is where your bottleneck was. Now it runs in parallel.
+				c := network.GetLocation(p)
+
+				// 4. Save the result safely
+				mu.Lock()
 				if len(succeedConfigs) < limit {
-					c := network.GetLocation(p)
 					succeedConfigs = append(succeedConfigs, VPN{
 						Path:    p,
 						Country: c,
@@ -181,8 +270,6 @@ LOOP:
 					if verbose {
 						fmt.Printf("\n[SUCCESS] %s --- %s\n", p, c)
 					}
-
-					// If we hit the limit, stop everything
 					if len(succeedConfigs) >= limit {
 						cancelLimit()
 					}

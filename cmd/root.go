@@ -82,7 +82,7 @@ var rootCmd = &cobra.Command{
 				c := network.GetLocation(currentConfig)
 
 				err := vpn.ConnectAndMonitor(ctx, currentConfig, c, Proconnect, verbose)
-				fmt.Println(reconnect, "after getting back from func")
+				// fmt.Println(reconnect, "after getting back from func")
 				if ctx.Err() != nil {
 					fmt.Println("User Exited!")
 					return
@@ -96,7 +96,7 @@ var rootCmd = &cobra.Command{
 						continue
 					}
 					if reconnect {
-						fmt.Println("in the reconnect attempt")
+						// fmt.Println("in the reconnect attempt")
 						reconnect = false
 						//// Not necessary
 						// exec.Command("killall", "openvpn", "-9").Run()
@@ -105,7 +105,7 @@ var rootCmd = &cobra.Command{
 							return
 						}
 						if len(vpns) == 1 {
-							fmt.Println("There's so saved config in your recent")
+							fmt.Println("There's no saved config in your recent")
 							return
 						}
 						failFiltered := slices.DeleteFunc(vpns, func(s vpn.VPN) bool {
@@ -122,15 +122,24 @@ var rootCmd = &cobra.Command{
 							return
 						}
 
-						if len(failFiltered) == 0 {
-							fmt.Println("There's so saved config in your recent")
+if len(failFiltered) == 0 {
+							fmt.Println("There's no saved config in your recent")
 							return
 						}
 						if len(failFiltered) > 0 {
-							newConfig := failFiltered[1].Path
-							*pCurrentConfig = newConfig
-							fmt.Println("New Config inserted", filepath.Base(currentConfig))
-							continue
+							// Fix index out of range by checking length before accessing index 1
+							if len(failFiltered) > 1 {
+								newConfig := failFiltered[1].Path
+								*pCurrentConfig = newConfig
+								fmt.Println("New Config inserted", filepath.Base(currentConfig))
+								continue
+							} else {
+								// If there's only one config, keep using the first one
+								newConfig := failFiltered[0].Path
+								*pCurrentConfig = newConfig
+								fmt.Println("New Config inserted", filepath.Base(currentConfig))
+								continue
+							}
 						}
 					}
 
