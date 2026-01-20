@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -17,94 +18,120 @@ const (
 	NewCipher = "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305:AES-128-CBC"
 )
 
-// will walk through every sub dir and detect the ovpn configs
+// Standardizes storage to ~/.config/vmate-cli/
+func getStoragePath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	configDir := filepath.Join(home, ".config", "vmate-cli")
+	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return "", err
+		}
+	}
+	return filepath.Join(configDir, "recent.txt"), nil
+}
+
 func GetConfigs(dir string) ([]string, error) {
 	configs := []string{}
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			if strings.Contains(err.Error(), "permission denied") {
-				// you can return nil too but i want to be explict here
-				return filepath.SkipDir
-			}
-			// will return with error if the error is serious
-			return err
+			return filepath.SkipDir
 		}
 		if !d.IsDir() && strings.HasSuffix(d.Name(), ".ovpn") {
 			configs = append(configs, path)
-			return nil
 		}
-
 		return nil
 	})
-
-	if err != nil {
-		return configs, err
-	}
-	return configs, nil
-
+	return configs, err
 }
 
 func SaveAsText(lines []vpn.VPN) (bool, error) {
-	fileName := "recent.txt"
-	file, err := os.Create(fileName)
+	path, err := getStoragePath()
 	if err != nil {
-		fmt.Println("Can't create the file")
+		return false, err
+	}
+	file, err := os.Create(path)
+	if err != nil {
 		return false, err
 	}
 	defer file.Close()
 	for _, line := range lines {
 		_, err := file.WriteString(line.Country + ";;" + line.Path + "\n")
 		if err != nil {
-			fmt.Println("Can't write to the file")
 			return false, err
 		}
 	}
-	return true, err
+	return true, nil
 }
 
 func OpenText() ([]vpn.VPN, error) {
-	vpns := []vpn.VPN{}
-	file, err := os.Open("recent.txt")
+	path, err := getStoragePath()
 	if err != nil {
-		fmt.Println("You don't have any previous saved configs!")
-		return []vpn.VPN{}, err
+		return nil, err
 	}
+	file, err := os.Open(path)
+	if err != nil {
+		return []vpn.VPN{}, nil
+	}
+	defer file.Close()
+
+	vpns := []vpn.VPN{}
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		parts := strings.Split(line, ";;")
-		vpns = append(vpns, vpn.VPN{
-			Country: parts[0],
-			Path:    parts[1],
-		})
-
+		parts := strings.Split(scanner.Text(), ";;")
+		if len(parts) >= 2 {
+			vpns = append(vpns, vpn.VPN{Country: parts[0], Path: parts[1]})
+		}
 	}
 	return vpns, nil
 }
 
-// in this function i tried to used scanner but it's make the function a lot more complex than it should be
-// so this ReadFile function is much make sense here
-func ModifyConfigs(paths []string) {
+func ExportConfigs(vpns []vpn.VPN, dest string) {
+	if dest == "" {
+		dest = "."
+	}
+	absDest, _ := filepath.Abs(dest)
+	_ = os.MkdirAll(absDest, 0755)
 
+	fmt.Printf("Exporting %d configs to: %s\n", len(vpns), absDest)
+	for _, v := range vpns {
+		// Sanitize name: Replace spaces with _ and prepend Country
+		originalName := filepath.Base(v.Path)
+		sanitizedName := strings.ReplaceAll(originalName, " ", "_")
+		newName := fmt.Sprintf("%s_%s", v.Country, sanitizedName)
+
+		sourceFile, err := os.Open(v.Path)
+		if err != nil {
+			continue
+		}
+
+		destFile, err := os.Create(filepath.Join(absDest, newName))
+		if err != nil {
+			sourceFile.Close()
+			continue
+		}
+
+		_, err = io.Copy(destFile, sourceFile)
+		sourceFile.Close()
+		destFile.Close()
+
+		if err == nil {
+			fmt.Printf("Exported: %s\n", newName)
+		}
+	}
+}
+
+func ModifyConfigs(paths []string) {
 	for _, dir := range paths {
 		content, err := os.ReadFile(dir)
-		newLines := []string{}
-		modified := false
-		if err != nil {
-			fmt.Println("Can't read the file")
+		if err != nil || bytes.HasPrefix(content, []byte("#MODIFIED\n")) {
+			continue
 		}
-		if bytes.HasPrefix(content, []byte("#MODIFIED\n")) {
-			fmt.Println("Your file", filepath.Base(dir), "is already modified")
-			return
-		}
-
 		lines := strings.Split(string(content), "\n")
-
-		//// IN MY SYSTEM SOMEHOW THERE'RE BUNCH OF TEMP OVPN FILES WITH NO BYTES IN THERE SO I USED THIS TO REMOVE THEM (use with caution)
-		// if len(lines) < 10 {
-		// 	os.Remove(dir)
-		// }
-
+		var newLines []string
+		modified := false
 		for _, line := range lines {
 			if strings.Contains(strings.TrimSpace(line), OldCipher) {
 				newLines = append(newLines, NewCipher)
@@ -113,13 +140,8 @@ func ModifyConfigs(paths []string) {
 				newLines = append(newLines, line)
 			}
 		}
-
 		if modified {
-			markMod := "#MODIFIED\n" + strings.Join(newLines, "\n")
-			os.WriteFile(dir, []byte(markMod), 0644)
-			fmt.Println("Your file", filepath.Base(dir), "is modified")
+			_ = os.WriteFile(dir, []byte("#MODIFIED\n"+strings.Join(newLines, "\n")), 0644)
 		}
-
 	}
-
 }
