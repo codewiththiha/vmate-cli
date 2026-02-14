@@ -141,6 +141,7 @@ vmate-cli --connect=/path/to/config.ovpn
 * [x] Config modifier for outdated ciphers
 * [x] Export functionality
 * [ ] **GUI version** (Currently in development using [Wails](https://wails.io/))
+* [ ] **Stealth Mode** - Add support for stealth mode with stunnel4 (stunnel integration)
 
 ## 🤝 Contributing
 

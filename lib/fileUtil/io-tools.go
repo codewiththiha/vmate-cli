@@ -19,6 +19,9 @@ const (
 )
 
 // Standardizes storage to ~/.config/vmate-cli/
+// getStoragePath returns the path to the history file (~/.config/vmate-cli/recent.txt).
+// It creates the directory if it doesn't exist.
+// TODO: Consider using a platform-specific config directory (e.g., XDG_CONFIG_HOME on Linux).
 func getStoragePath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -33,6 +36,8 @@ func getStoragePath() (string, error) {
 	return filepath.Join(configDir, "recent.txt"), nil
 }
 
+// GetConfigs recursively scans the specified directory for .ovpn files.
+// TODO: Add support for excluding certain directories (e.g., .git, node_modules) or using glob patterns.
 func GetConfigs(dir string) ([]string, error) {
 	configs := []string{}
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
@@ -47,6 +52,8 @@ func GetConfigs(dir string) ([]string, error) {
 	return configs, err
 }
 
+// SaveAsText saves a list of successful VPN configurations to the history file.
+// TODO: Use a more structured format like JSON or SQLite for better history management and searching.
 func SaveAsText(lines []vpn.VPN) (bool, error) {
 	path, err := getStoragePath()
 	if err != nil {
@@ -66,6 +73,8 @@ func SaveAsText(lines []vpn.VPN) (bool, error) {
 	return true, nil
 }
 
+// OpenText reads the successful VPN configurations from the history file.
+// TODO: Implement a cleaning mechanism for old or invalid configurations in the history.
 func OpenText() ([]vpn.VPN, error) {
 	path, err := getStoragePath()
 	if err != nil {
@@ -88,6 +97,8 @@ func OpenText() ([]vpn.VPN, error) {
 	return vpns, nil
 }
 
+// ExportConfigs copies successful VPN configs to a destination directory with sanitized names.
+// TODO: Compress the exported configs into a ZIP or TAR archive.
 func ExportConfigs(vpns []vpn.VPN, dest string) {
 	if dest == "" {
 		dest = "."
@@ -123,6 +134,8 @@ func ExportConfigs(vpns []vpn.VPN, dest string) {
 	}
 }
 
+// ModifyConfigs updates outdated cipher settings in .ovpn files to improve compatibility.
+// TODO: Add support for more configuration adjustments (e.g., adding 'auth-user-pass').
 func ModifyConfigs(paths []string) {
 	for _, dir := range paths {
 		content, err := os.ReadFile(dir)

@@ -209,6 +209,9 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+// runProgressBar displays a simple CLI progress bar to track the progress of VPN testing.
+// It takes the total number of configs and a channel for updates.
+// TODO: Use a more sophisticated library like 'progressbar' for better aesthetics.
 func runProgressBar(total int, updates <-chan int) {
 	current := 0
 	for range updates {
@@ -225,6 +228,9 @@ func runProgressBar(total int, updates <-chan int) {
 	fmt.Print("\n")
 }
 
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+// TODO: Add support for configuration files (e.g., YAML or JSON) to store default settings.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -245,6 +251,9 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&exportPath, "export", "e", "", "Export folder path")
 }
 
+// ensureRootPrivileges checks if the current process has root privileges (UID 0).
+// If not, it attempts to re-run the command with 'sudo'.
+// TODO: Consider using a more cross-platform way to handle elevation or provide a clearer error message.
 func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limit int, timeout int, modify bool, connect string, export string) bool {
 	if os.Getuid() == 0 {
 		return true
@@ -283,6 +292,8 @@ func ensureRootPrivileges(expandedDir string, verbose bool, maxworkers int, limi
 	return false
 }
 
+// expandPath expands the tilde (~) in a file path to the user's home directory.
+// TODO: Use a standard library or more robust path expansion logic for better compatibility.
 func expandPath(path string) (string, error) {
 	if strings.HasPrefix(path, "~/") {
 		homeDir, _ := os.UserHomeDir()
@@ -291,6 +302,8 @@ func expandPath(path string) (string, error) {
 	return path, nil
 }
 
+// checkIncompatibleFlags checks if multiple mutually exclusive flags are used together.
+// TODO: Refactor flag validation into a more declarative structure or use Cobra's MarkFlagsMutuallyExclusive.
 func checkIncompatibleFlags(current string, verboseAllow bool) bool {
 	// If connect is being used, only verbose is allowed.
 	// We ignore defaults by checking if the values were changed or if they differ from default.

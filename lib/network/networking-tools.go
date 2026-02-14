@@ -14,6 +14,8 @@ import (
 // I know mf :)) they offer free with no limits
 const apiKey = "44936a1f60206d"
 
+// ExtractHost parses an .ovpn file to find the 'remote' host address.
+// TODO: Support multiple remote addresses if defined in the config.
 func ExtractHost(dir string) (string, error) {
 	file, err := os.Open(dir)
 	if err != nil {
@@ -43,6 +45,8 @@ func ExtractHost(dir string) (string, error) {
 	return "", err
 }
 
+// IpResolve resolves a hostname to an IP address.
+// TODO: Implement IPv6 support and handle Multiple IP addresses gracefully.
 func IpResolve(host string) (string, error) {
 	ips, err := net.LookupIP(host)
 	if err != nil {
@@ -53,6 +57,8 @@ func IpResolve(host string) (string, error) {
 	return ips[0].String(), nil
 }
 
+// GetLocation fetches the country code for a given .ovpn config using ipinfo.io API.
+// TODO: Add support for local GeoIP databases for offline use or as a fallback.
 func GetLocation(dir string) string {
 	host, err := ExtractHost(dir)
 	if err != nil {

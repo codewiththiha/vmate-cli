@@ -38,6 +38,8 @@ var ErrorKeywords = []string{
 	"killed",
 }
 
+// getArgs returns the appropriate command-line arguments for OpenVPN based on the operation mode.
+// TODO: Expand this to support different OpenVPN versions and specific flags for stealth mode.
 func getArgs(fun string, filePath string) []string {
 	if fun == "test" {
 		return []string{
@@ -51,8 +53,10 @@ func getArgs(fun string, filePath string) []string {
 	return []string{}
 }
 
+// testVPN attempts to connect to a VPN configuration within a limited time and checks for success.
 // Update 1: Pass parent context to allow Ctrl+C to propagate immediately,
 // while keeping the specific timeout logic here.
+// TODO: Explore using the management interface of OpenVPN for better status monitoring.
 func testVPN(ctx context.Context, dir string, timeoutSec int) bool {
 	// Create a child context that expires after X seconds OR if parent is canceled
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
@@ -200,7 +204,9 @@ type VPN struct {
 // 	return succeedConfigs
 // }
 
-// New Function that's also use go-routines for ipinfo fetching
+// RunTest executes concurrent VPN tests on a list of configuration paths.
+// It uses a worker pool to control concurrency and respects the specified limit.
+// TODO: Implement a dynamic timeout system that adjusts based on network conditions.
 func RunTest(ctx context.Context, paths []string, verbose bool, maxworkers int, limit int, timeout int, progressChan chan<- int) []VPN {
 	succeedConfigs := []VPN{}
 
@@ -287,8 +293,9 @@ LOOP:
 	return succeedConfigs
 }
 
-// This function will complain the restart errors
-// add verbose
+// ConnectAndMonitor starts a VPN connection and monitors its status.
+// It uses a two-phase connection process: a strict handshake phase and an indefinite monitoring phase.
+// TODO: Implement automatic rotation of configs if the current one fails after a successful connection.
 func ConnectAndMonitor(ctx context.Context, configPath string, c string, preconnect *bool, verbose bool) error {
 	// 1. Start command with PARENT context (ctx), not the timeout context.
 	// This ensures the process isn't auto-killed after 5 seconds.
