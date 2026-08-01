@@ -1,4 +1,10 @@
 //! ipinfo.io lookup.
+//!
+//! The request mirrors the original Go vmate-cli exactly:
+//! `GET https://api.ipinfo.io/lite/{ip}?token={token}` decoding only the
+//! `country_code` field from the response. The lite endpoint also returns a
+//! full `country` name, so the struct must NOT also map `country` — doing so
+//! makes serde reject the payload as a duplicate field.
 
 use crate::country::CountryCode;
 use reqwest::Client;
@@ -8,12 +14,14 @@ use reqwest::Client;
 /// `IPINFO_TOKEN`.
 pub const DEFAULT_IPINFO_TOKEN: &str = "44936a1f60206d";
 
-/// Response shape for `https://api.ipinfo.io/lite/{ip}`. The free endpoint
-/// returns `country_code`; the standard endpoint returns `country`.
+/// Response shape for `https://api.ipinfo.io/lite/{ip}`.
+///
+/// Only `country_code` is decoded — the same field the Go version read. The
+/// lite payload additionally carries `country` (the full name) and other
+/// fields, which are intentionally ignored.
 #[derive(serde::Deserialize)]
 pub struct IpInfoResponse {
-    #[serde(alias = "country_code", alias = "country")]
-    pub country: Option<String>,
+    pub country_code: Option<String>,
 }
 
 /// Look up the country for an IP address.
@@ -44,6 +52,32 @@ pub async fn lookup_country(client: &Client, ip: &str, token: Option<&str>) -> O
             return None;
         }
     };
-    let country = body.country?;
+    let country = body.country_code?;
     CountryCode::new(country).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression test for the exact lite-endpoint payload, which contains
+    /// both `country_code` and `country`. Decoding only `country_code` must
+    /// not be rejected as a duplicate field.
+    #[test]
+    fn decodes_country_code_from_lite_payload() {
+        let body: IpInfoResponse = serde_json::from_str(
+            r#"{
+                "ip": "1.1.1.1",
+                "asn": "AS13335",
+                "as_name": "Cloudflare, Inc.",
+                "as_domain": "cloudflare.com",
+                "country_code": "AU",
+                "country": "Australia",
+                "continent_code": "OC",
+                "continent": "Oceania"
+            }"#,
+        )
+        .expect("lite payload should decode");
+        assert_eq!(body.country_code.as_deref(), Some("AU"));
+    }
 }
