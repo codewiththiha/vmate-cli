@@ -1,0 +1,30 @@
+[package]
+name = "vmate-core"
+description = "Library of domain logic for vmate: scanning, testing, and connecting to OpenVPN configs."
+edition.workspace = true
+rust-version.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+directories.workspace = true
+hex.workspace = true
+nix.workspace = true
+rand.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+sha2.workspace = true
+shellexpand.workspace = true
+sqlx.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+tracing.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
