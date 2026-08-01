@@ -44,7 +44,7 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
         dir: args.scan.dir.clone(),
         limit: args.scan.limit,
         timeout: args.scan.timeout,
-        workers: args.scan.workers,
+        workers: args.scan.max,
         modify: args.scan.modify,
         backup: args.scan.backup,
         export: args.scan.export.clone(),

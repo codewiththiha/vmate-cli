@@ -44,8 +44,10 @@ cargo fmt --check
 ## Usage
 
 ```bash
-# Scan ~/configs, keep testing until 20 Japan/Korea configs succeed
-vmate scan ~/configs --filter jp,kr --limit 20
+# Scan ~/configs, keep testing until 20 Japan/Korea configs succeed.
+# --max / -m controls concurrency, --timeout / -t is per-test seconds
+# (Go-compatible), and they combine with --filter and -v.
+vmate scan ~/configs --filter jp,kr --limit 20 --max 64 --timeout 15 -v
 
 # Connect using stored JP candidates only
 vmate connect --filter jp
@@ -83,6 +85,14 @@ Values are case-insensitive; `UNKNOWN` is allowed. An empty filter matches
 everything. During a scan, the filter limits what is *reported/exported*, not
 what is *tested* — unfiltered successes are still stored in the database so
 they show up in `vmate recent` later.
+
+### Country lookup
+
+Configs are tagged with a country using, in order: a two-letter code embedded
+in the file name (e.g. `vpngate_..._jp_...ovpn`), the SQLite IP cache, then
+the ipinfo.io API. The free ipinfo.io token from the original Go vmate-cli is
+used by default, so no configuration is needed; override it with
+`--ipinfo-token` or `IPINFO_TOKEN`.
 
 ### Connect keys
 

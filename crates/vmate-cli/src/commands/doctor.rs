@@ -68,11 +68,10 @@ pub async fn run(settings: &Settings) -> Result<()> {
     table.add_row([
         "ipinfo token".to_string(),
         if settings.ipinfo_token.is_some() {
-            "present"
+            "present".to_string()
         } else {
-            "missing"
-        }
-        .to_string(),
+            "default (free key)".to_string()
+        },
     ]);
     table.add_row([
         "killall -9 openvpn".to_string(),

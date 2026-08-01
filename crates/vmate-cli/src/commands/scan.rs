@@ -43,7 +43,7 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         dir: args.dir.clone(),
         limit: args.limit,
         timeout: args.timeout,
-        workers: args.workers,
+        workers: args.max,
         modify: args.modify,
         backup: args.backup,
         export: args.export.clone(),

@@ -261,7 +261,14 @@ impl ConfigRepo {
 
         let Some(row) = row else { return Ok(None) };
         let country: String = row.get("country");
-        Ok(CountryCode::new(country).ok())
+        let code = CountryCode::new(country).ok();
+        // A cached UNKNOWN is not a useful hit: it means a lookup previously
+        // failed, so treat it as a miss and let the API be retried.
+        if code.as_ref().is_some_and(|c| c.is_unknown()) {
+            Ok(None)
+        } else {
+            Ok(code)
+        }
     }
 
     /// Persist an IP -> country mapping.

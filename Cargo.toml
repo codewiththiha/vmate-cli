@@ -38,7 +38,7 @@ sqlx = { version = "0.8", features = [
 ] }
 
 # HTTP / JSON
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "system-proxy"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -80,7 +80,19 @@ assert_cmd = "2"
 predicates = "3"
 
 [profile.release]
-lto = "thin"
+# Size-optimized release build.
 opt-level = "s"
-strip = true
+lto = true
 codegen-units = 1
+strip = "symbols"
+
+# macOS 26+/27 dyld rejects dylibs whose LINKEDIT string pool is misaligned.
+# rustc < 1.96 with stripped debuginfo can emit such proc-macro dylibs
+# (rust-lang/rust#157750: "mis-aligned LINKEDIT string pool"), which makes
+# sqlx_macros fail to dlopen. Building build-dependencies (which include every
+# proc-macro crate) unoptimized and unstripped avoids the corrupt layout while
+# the final binary is still fully optimized and stripped.
+[profile.release.build-override]
+opt-level = 0
+codegen-units = 16
+strip = "none"

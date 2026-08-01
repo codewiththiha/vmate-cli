@@ -31,14 +31,14 @@ pub trait GeoLocator: Send + Sync {
 /// Resolution order:
 /// 1. A two-letter code embedded in the file name (fast, no network).
 /// 2. The SQLite IP cache.
-/// 3. ipinfo.io (only when a token is configured).
+/// 3. ipinfo.io — using the free token from the original Go tool by default,
+///    overridable with `--ipinfo-token` / `IPINFO_TOKEN`.
 ///
 /// Failures degrade to `UNKNOWN` — geo lookup must never abort a scan.
 pub struct IpInfoGeoLocator {
     pub client: reqwest::Client,
     pub repo: Arc<ConfigRepo>,
     pub token: Option<String>,
-    pub allow_network: bool,
     pub memo: cache::GeoMemo,
 }
 
@@ -85,13 +85,6 @@ impl GeoLocator for IpInfoGeoLocator {
             });
         }
 
-        if !self.allow_network {
-            return Ok(CountryLookup {
-                country: CountryCode::unknown(),
-                source: CountrySource::Unknown,
-            });
-        }
-
         let country = match ipinfo::lookup_country(&self.client, &ip, self.token.as_deref()).await {
             Some(c) => c,
             None => CountryCode::unknown(),
@@ -102,7 +95,11 @@ impl GeoLocator for IpInfoGeoLocator {
             CountrySource::IpApi
         };
 
-        let _ = self.repo.cache_country_for_ip(&ip, &country).await;
+        // Only persist real countries. Caching UNKNOWN would make a transient
+        // API failure permanent for that IP.
+        if !country.is_unknown() {
+            let _ = self.repo.cache_country_for_ip(&ip, &country).await;
+        }
         self.memo.set(ip, country.clone());
 
         Ok(CountryLookup { country, source })
@@ -111,8 +108,11 @@ impl GeoLocator for IpInfoGeoLocator {
 
 impl IpInfoGeoLocator {
     /// Build a locator with a per-session in-memory memo layered over SQLite.
+    ///
+    /// When no token is supplied the free token from the original Go tool is
+    /// used, so country lookup works without any configuration.
     pub fn new(repo: Arc<ConfigRepo>, token: Option<String>) -> Self {
-        let allow_network = token.is_some();
+        let token = token.or_else(|| Some(ipinfo::DEFAULT_IPINFO_TOKEN.to_string()));
         Self {
             client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(5))
@@ -120,7 +120,6 @@ impl IpInfoGeoLocator {
                 .expect("reqwest client build cannot fail"),
             repo,
             token,
-            allow_network,
             memo: cache::GeoMemo::new(),
         }
     }

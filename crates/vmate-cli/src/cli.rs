@@ -105,7 +105,7 @@ pub struct ScanArgs {
 
     /// Maximum concurrent OpenVPN test processes.
     #[arg(long, short = 'm', default_value_t = 64)]
-    pub workers: usize,
+    pub max: usize,
 
     /// Modify outdated cipher lines before testing.
     #[arg(long)]
