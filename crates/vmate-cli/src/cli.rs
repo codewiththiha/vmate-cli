@@ -99,7 +99,7 @@ pub struct ScanArgs {
         long,
         short = 't',
         default_value = "15s",
-        value_parser = humantime::parse_duration
+        value_parser = parse_duration
     )]
     pub timeout: std::time::Duration,
 
@@ -133,7 +133,7 @@ pub struct ConnectArgs {
     #[arg(
         long,
         default_value = "5s",
-        value_parser = humantime::parse_duration
+        value_parser = parse_duration
     )]
     pub connect_timeout: std::time::Duration,
 
@@ -148,7 +148,7 @@ pub struct ConnectArgs {
     #[arg(
         long,
         default_value = "30s",
-        value_parser = humantime::parse_duration
+        value_parser = parse_duration
     )]
     pub cooldown: std::time::Duration,
 
@@ -200,4 +200,16 @@ pub struct ExportArgs {
     /// Destination directory for exported configs.
     #[arg(long, short = 'o', default_value = "./exported")]
     pub out: PathBuf,
+}
+
+/// Parse a duration for `--timeout` and friends.
+///
+/// Bare numbers are treated as seconds to stay compatible with the original
+/// Go tool (`--timeout 15`), while `5s`, `500ms`, etc. are also accepted via
+/// humantime.
+fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
+    if let Ok(secs) = s.parse::<u64>() {
+        return Ok(std::time::Duration::from_secs(secs));
+    }
+    humantime::parse_duration(s).map_err(|e| e.to_string())
 }
