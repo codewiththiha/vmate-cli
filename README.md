@@ -165,11 +165,40 @@ Checks for OpenVPN, root access, and database health.
 
 #### `completions` — shell completion scripts
 
+`vmate-cli` can generate completion scripts for bash, zsh and fish — either
+printed to stdout so you can capture them, or installed automatically:
+
 ```bash
+# Print the script (capture it yourself)
 vmate-cli completions bash
 vmate-cli completions zsh
 vmate-cli completions fish
+
+# Install it to the standard location and print activation steps
+vmate-cli completions bash --install
+vmate-cli completions zsh --install
+vmate-cli completions fish --install
 ```
+
+`--install` writes the script where your shell already looks (for zsh it
+prefers a Homebrew `zsh-completions` dir already on `$fpath`, falling back to
+`~/.zfunc`), then tells you what to do to activate it. If you installed the
+script with a specific shell manually, the equivalent one-liners are:
+
+```bash
+# bash
+echo 'source <(vmate-cli completions bash)' >> ~/.bashrc
+
+# zsh (with fpath + compinit)
+mkdir -p ~/.zfunc && vmate-cli completions zsh > ~/.zfunc/_vmate-cli
+echo 'fpath=(~/.zfunc $fpath); autoload -Uz compinit && compinit' >> ~/.zshrc
+
+# fish
+mkdir -p ~/.config/fish/completions
+vmate-cli completions fish > ~/.config/fish/completions/vmate-cli.fish
+```
+
+Restart your shell (or run `compinit` in zsh) for the completions to load.
 
 ## Filtering
 

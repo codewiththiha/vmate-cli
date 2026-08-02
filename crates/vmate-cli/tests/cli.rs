@@ -64,6 +64,25 @@ fn completions_generate_bash() {
 }
 
 #[test]
+fn completions_install_bash_writes_file() {
+    let home = tempfile::tempdir().unwrap();
+    let dest = home
+        .path()
+        .join(".local/share/bash-completion/completions/vmate-cli");
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
+    cmd.args(["completions", "bash", "--install"])
+        .env("HOME", home.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Installed bash completion"))
+        .stdout(predicate::str::contains(dest.display().to_string()));
+
+    let content = std::fs::read_to_string(&dest).expect("completion file written");
+    assert!(content.contains("vmate-cli"));
+    assert!(content.contains("complete"));
+}
+
+#[test]
 fn invalid_filter_is_rejected() {
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["recent", "--filter", "JPNX"])
