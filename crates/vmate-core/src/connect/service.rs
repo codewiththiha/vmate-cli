@@ -24,7 +24,6 @@ use tokio_util::sync::CancellationToken;
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
     pub connect_timeout: Duration,
-    pub verbose: bool,
     pub killall_enabled: bool,
 }
 
@@ -49,6 +48,7 @@ impl ConnectService {
             }
             let candidate = first;
             let mut failures: u32 = 0;
+            let mut last_reason: Option<String> = None;
             let mut reconnecting = false;
 
             loop {
@@ -62,10 +62,16 @@ impl ConnectService {
                 } else if failures == 0 {
                     format!("Connecting to {}", candidate.country)
                 } else {
-                    format!(
-                        "Retrying {} (failure {failures}/{MAX_FAILURES})",
-                        candidate.country
-                    )
+                    match &last_reason {
+                        Some(reason) => format!(
+                            "Retrying {} (failure {failures}/{MAX_FAILURES}): {reason}",
+                            candidate.country
+                        ),
+                        None => format!(
+                            "Retrying {} (failure {failures}/{MAX_FAILURES})",
+                            candidate.country
+                        ),
+                    }
                 };
                 host.status(&ConnectionStatus {
                     connected: false,
@@ -80,14 +86,13 @@ impl ConnectService {
                 let mut handle = match self.runner.spawn(&args) {
                     Ok(h) => h,
                     Err(e) => {
+                        // A spawn failure is systemic (missing binary, broken
+                        // exec), not a per-config failure — abort the session
+                        // rather than deleting configs from history.
                         host.notify(&format!("failed to start openvpn: {e:#}"))
                             .await?;
-                        failures += 1;
-                        if failures >= MAX_FAILURES {
-                            self.drop_candidate(&candidate, failures, host).await?;
-                            break;
-                        }
-                        continue; // same candidate, no DB write yet
+                        host.finish().await?;
+                        return Err(e);
                     }
                 };
                 let pid = handle.child.id().unwrap_or(0);
@@ -107,6 +112,7 @@ impl ConnectService {
                     ConnectOutcome::Connected => {
                         let _ = self.record_connected(&candidate).await;
                         failures = 0; // successful handshake resets the budget
+                        last_reason = None;
                         let exit = self
                             .monitor_connected(&candidate, &mut handle, host, &cancel)
                             .await?;
@@ -127,7 +133,12 @@ impl ConnectService {
                                 continue; // penalty-free
                             }
                             Phase2Exit::Crashed(reason) => {
+                                let _ = self
+                                    .repo
+                                    .note_connect_failure(Path::new(&candidate.path))
+                                    .await;
                                 failures += 1;
+                                last_reason = Some(reason.clone());
                                 if failures >= MAX_FAILURES {
                                     self.drop_candidate(&candidate, failures, host).await?;
                                     break;
@@ -147,10 +158,21 @@ impl ConnectService {
                             ConnectOutcome::Exited => {
                                 "openvpn exited before connecting".to_string()
                             }
-                            _ => unreachable!(),
+                            // Connected/Cancelled are matched above; this arm is
+                            // unreachable for them, but keeping the variants
+                            // explicit makes future ConnectOutcome additions a
+                            // compile error instead of a silent panic.
+                            ConnectOutcome::Connected | ConnectOutcome::Cancelled => {
+                                unreachable!()
+                            }
                         };
                         self.kill_handle(pid, &mut handle).await; // targeted kill only
+                        let _ = self
+                            .repo
+                            .note_connect_failure(Path::new(&candidate.path))
+                            .await;
                         failures += 1;
+                        last_reason = Some(reason.clone());
                         if failures >= MAX_FAILURES {
                             self.drop_candidate(&candidate, failures, host).await?;
                             break;
@@ -254,7 +276,6 @@ mod tests {
             repo,
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
-                verbose: false,
                 killall_enabled: false,
             },
         }
@@ -276,7 +297,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn spawn_failure_drops_candidate_after_two_attempts() {
+    async fn spawn_failure_aborts_and_preserves_history() {
         let dir = tempfile::tempdir().unwrap();
         let repo = Arc::new(ConfigRepo::new(
             init_pool(&dir.path().join("t.db")).await.unwrap(),
@@ -297,17 +318,9 @@ mod tests {
         ]);
 
         let mut host = FakeHost::new(vec![]);
-        service.run(queue, &mut host).await.unwrap();
-        // Each candidate fails to spawn twice, then is dropped: 2 spawn-fail
-        // notifies + 1 drop notify per candidate.
-        let dropped = host
-            .messages
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|m| m.contains("dropped"))
-            .count();
-        assert_eq!(dropped, 2);
+        // Spawn failure is systemic and must abort the session, not delete
+        // every config from history.
+        assert!(service.run(queue, &mut host).await.is_err());
     }
 
     #[tokio::test]
@@ -337,7 +350,6 @@ mod tests {
             repo: repo.clone(),
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
-                verbose: false,
                 killall_enabled: false,
             },
         };

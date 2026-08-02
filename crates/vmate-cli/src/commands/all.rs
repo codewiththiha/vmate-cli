@@ -110,13 +110,13 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     });
     let options = ConnectOptions {
         connect_timeout: args.connect.connect_timeout,
-        verbose: crate::app::is_verbose(verbose),
         killall_enabled: settings.killall_enabled,
     };
 
     let mut host = crate::ui::connect::ConnectTui::new(
         args.connect.no_interactive,
         settings.filter.to_display(),
+        crate::app::is_verbose(verbose),
     )?;
     let service = ConnectService {
         runner,

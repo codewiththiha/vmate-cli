@@ -87,4 +87,22 @@ impl ConfigRepo {
         .context("mark_skipped failed")?;
         Ok(())
     }
+
+    /// Bump the failure counters for a config that failed to connect, without
+    /// flipping its status (so it stays visible and subject to `--cooldown`
+    /// in the next session).
+    pub async fn note_connect_failure(&self, path: &Path) -> Result<()> {
+        sqlx::query(
+            "UPDATE configs SET \
+                 failure_count   = failure_count + 1, \
+                 last_failure_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), \
+                 updated_at      = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') \
+             WHERE path = ?1",
+        )
+        .bind(path.to_string_lossy().as_ref())
+        .execute(&self.pool)
+        .await
+        .context("note_connect_failure failed")?;
+        Ok(())
+    }
 }

@@ -33,7 +33,6 @@ impl ConnectService {
         host: &mut dyn crate::connect::host::ConnectHost,
         cancel: &CancellationToken,
     ) -> Result<Phase2Exit> {
-        let mut verbose = self.options.verbose;
         host.status(&ConnectionStatus {
             connected: true,
             candidate: Some(candidate.clone()),
@@ -49,7 +48,10 @@ impl ConnectService {
                     Some(UserCommand::Reconnect)     => return Ok(Phase2Exit::Reconnect),
                     Some(UserCommand::Quit)          => return Ok(Phase2Exit::Quit),
                     Some(UserCommand::CopyPath)      => { let _ = host.copy(&candidate.path).await; }
-                    Some(UserCommand::ToggleVerbose) => { verbose = !verbose; }
+                    // Verbose rendering is owned by the host (it toggles on
+                    // the `v` key); the service always feeds it lines so the
+                    // toggle state survives crashes and reconnects.
+                    Some(UserCommand::ToggleVerbose) => {}
                     Some(UserCommand::Help)          => {
                         let _ = host.notify("[n] next  [r] reconnect  [c] copy  [v] verbose  [q] quit").await;
                     }
@@ -59,9 +61,7 @@ impl ConnectService {
                     let Some(line) = line else {
                         return Ok(Phase2Exit::Crashed("openvpn exited unexpectedly".into()));
                     };
-                    if verbose {
-                        let _ = host.log(&line).await;
-                    }
+                    let _ = host.log(&line).await;
                     match classify_line(&line) {
                         VpnLineClass::Error(kw) => {
                             return Ok(Phase2Exit::Crashed(format!("connection error: {kw}")));

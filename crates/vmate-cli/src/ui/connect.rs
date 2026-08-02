@@ -37,7 +37,7 @@ pub struct ConnectTui {
 }
 
 impl ConnectTui {
-    pub fn new(no_interactive: bool, filter: String) -> Result<Self> {
+    pub fn new(no_interactive: bool, filter: String, verbose: bool) -> Result<Self> {
         enable_raw_mode()?;
         // Held immediately so the terminal is restored even if a later step
         // fails; moved into the struct once fully constructed.
@@ -51,7 +51,7 @@ impl ConnectTui {
         Ok(Self {
             term,
             connected_since: None,
-            verbose: false,
+            verbose,
             no_interactive,
             filter,
             status: ConnectionStatus {
@@ -189,7 +189,10 @@ impl ConnectTui {
                 }
                 KeyCode::Char('n') => Some(UserCommand::Next),
                 KeyCode::Char('r') => Some(UserCommand::Reconnect),
-                KeyCode::Char('v') => Some(UserCommand::ToggleVerbose),
+                KeyCode::Char('v') => {
+                    self.verbose = !self.verbose;
+                    Some(UserCommand::ToggleVerbose)
+                }
                 KeyCode::Char('?') => Some(UserCommand::Help),
                 KeyCode::Char('q') | KeyCode::Esc => Some(UserCommand::Quit),
                 KeyCode::Char('c') => Some(UserCommand::CopyPath),
