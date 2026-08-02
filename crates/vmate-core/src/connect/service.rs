@@ -100,6 +100,7 @@ impl ConnectService {
                     &mut handle.lines,
                     self.options.connect_timeout,
                     cancel.clone(),
+                    host,
                 )
                 .await;
 

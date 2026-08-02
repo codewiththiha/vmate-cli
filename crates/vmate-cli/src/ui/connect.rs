@@ -24,10 +24,18 @@ use vmate_core::connect::{ConnectHost, ConnectionStatus, UserCommand};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
+/// How long transient messages (e.g. `Copied: ...`, help text) stay visible
+/// before reverting to the connected status.
+const MESSAGE_TTL: Duration = Duration::from_secs(3);
+
 /// The connect-mode terminal host.
 pub struct ConnectTui {
     term: Term,
     connected_since: Option<Instant>,
+    /// When the last transient message was shown (`copy`/`notify`, or the
+    /// connected confirmation). `None` means the current message is a
+    /// persistent service status (connecting/reconnecting/retrying).
+    message_since: Option<Instant>,
     verbose: bool,
     no_interactive: bool,
     filter: String,
@@ -51,6 +59,7 @@ impl ConnectTui {
         Ok(Self {
             term,
             connected_since: None,
+            message_since: None,
             verbose,
             no_interactive,
             filter,
@@ -88,7 +97,13 @@ impl ConnectTui {
             ("Connecting", Color::Yellow)
         };
         let filter = self.filter.clone();
-        let message = self.status.message.clone();
+        // Transient messages (Copied/help/connected confirmation) fade after
+        // MESSAGE_TTL; connecting/reconnecting statuses stay persistent.
+        let message = match self.message_since {
+            Some(ts) if ts.elapsed() < MESSAGE_TTL => self.status.message.clone(),
+            Some(_) => String::new(),
+            None => self.status.message.clone(),
+        };
         let verbose = self.verbose;
         let log_text = if verbose {
             self.log.iter().cloned().collect::<Vec<_>>().join("\n")
@@ -212,11 +227,20 @@ impl ConnectHost for ConnectTui {
             self.connected_since = None;
         }
         self.status = s.clone();
+        // Once connected, the "Connected successfully to {country}" message is
+        // redundant with the "Connected: {country}" header, so it fades like
+        // other transient messages. Connecting/reconnecting statuses stay up.
+        self.message_since = if s.connected {
+            Some(Instant::now())
+        } else {
+            None
+        };
         self.draw()
     }
 
     async fn notify(&mut self, message: &str) -> Result<()> {
         self.status.message = message.to_string();
+        self.message_since = Some(Instant::now());
         self.draw()
     }
 
@@ -233,6 +257,7 @@ impl ConnectHost for ConnectTui {
             Ok(method) => format!("Copied: {text} ({method})"),
             Err(err) => format!("copy failed: {err}"),
         };
+        self.message_since = Some(Instant::now());
         self.draw()
     }
 

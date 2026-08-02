@@ -95,7 +95,7 @@ impl ConfigRepo {
         Ok(rows)
     }
 
-    /// Count configs with a given status (used by `vmate doctor`).
+    /// Count configs with a given status (used by `vmate-cli doctor`).
     pub async fn count_configs(&self, status: ConfigStatus) -> Result<i64> {
         let row = sqlx::query("SELECT COUNT(*) AS n FROM configs WHERE status = ?1")
             .bind(status.as_str())

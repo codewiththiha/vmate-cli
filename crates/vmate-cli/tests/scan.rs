@@ -16,7 +16,7 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 #[test]
 fn scan_empty_dir_succeeds() {
     let (dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args([
         "scan",
         dir.path().to_str().unwrap(),
@@ -33,7 +33,7 @@ fn scan_empty_dir_succeeds() {
 #[test]
 fn scan_missing_dir_fails_cleanly() {
     let (_, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["scan", "/nonexistent/vmate-test-dir", "--no-killall"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
@@ -73,7 +73,7 @@ fn scan_stores_and_reports_successes() {
     )
     .unwrap();
 
-    let mut scan = Command::cargo_bin("vmate").unwrap();
+    let mut scan = Command::cargo_bin("vmate-cli").unwrap();
     scan.args(["scan", configs.to_str().unwrap(), "--no-killall"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
@@ -84,7 +84,7 @@ fn scan_stores_and_reports_successes() {
         .stdout(predicate::str::contains("Found total:   2"));
 
     // The successes must now be visible via `recent`.
-    let mut recent = Command::cargo_bin("vmate").unwrap();
+    let mut recent = Command::cargo_bin("vmate-cli").unwrap();
     recent
         .args(["recent", "--no-tui"])
         .env("VMATE_DB", &db)
@@ -126,7 +126,7 @@ fn scan_filter_limits_reported_matches() {
         .unwrap();
     }
 
-    let mut scan = Command::cargo_bin("vmate").unwrap();
+    let mut scan = Command::cargo_bin("vmate-cli").unwrap();
     scan.args([
         "scan",
         configs.to_str().unwrap(),

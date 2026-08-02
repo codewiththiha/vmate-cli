@@ -13,7 +13,7 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 #[test]
 fn connect_empty_history_is_graceful() {
     let (_dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["connect", "--no-killall"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
@@ -25,7 +25,7 @@ fn connect_empty_history_is_graceful() {
 #[test]
 fn connect_with_filter_empty_history_mentions_filter() {
     let (_dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["connect", "--filter", "jp", "--no-killall"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
@@ -42,7 +42,7 @@ fn connect_strict_filter_rejects_non_matching_explicit_config() {
     let config = dir.path().join("us-config.ovpn");
     std::fs::write(&config, "client\nremote us.example.com 1194 udp\n").unwrap();
 
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args([
         "connect",
         config.to_str().unwrap(),

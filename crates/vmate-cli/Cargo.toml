@@ -1,13 +1,13 @@
 [package]
 name = "vmate-cli"
-description = "OpenVPN config scanner, tester and connector — Rust port of vmate-cli."
+description = "OpenVPN config scanner, tester and connector."
 edition.workspace = true
 rust-version.workspace = true
 version.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "vmate"
+name = "vmate-cli"
 path = "src/main.rs"
 
 [dependencies]

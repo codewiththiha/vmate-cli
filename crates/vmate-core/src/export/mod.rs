@@ -2,4 +2,7 @@
 
 pub mod service;
 
-pub use service::{ExportResult, export_configs, sanitize_filename, unique_destination};
+pub use service::{
+    ExportResult, export_configs, export_configs_from_matches, sanitize_filename,
+    unique_destination,
+};

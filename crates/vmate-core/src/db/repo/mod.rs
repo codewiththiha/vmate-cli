@@ -11,7 +11,7 @@ use sqlx::Row;
 use sqlx::sqlite::SqlitePool;
 use std::path::Path;
 
-/// All persistence for vmate lives behind this type.
+/// All persistence for vmate-cli lives behind this type.
 ///
 /// Queries use `INSERT ... ON CONFLICT(path) DO UPDATE` so a config keeps one
 /// row across scans, connections and failures.

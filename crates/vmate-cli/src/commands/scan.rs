@@ -1,4 +1,4 @@
-//! `vmate scan`: discover configs, test them concurrently, store and report.
+//! `vmate-cli scan`: discover configs, test them concurrently, store and report.
 
 use crate::cli::ScanArgs;
 use crate::settings::Settings;
@@ -46,7 +46,6 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         workers: args.max,
         modify: args.modify,
         backup: args.backup,
-        export: args.export.clone(),
         no_save: args.no_save,
         filter: settings.filter.clone(),
     };
@@ -72,10 +71,12 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
 
     print_report(&report, settings);
 
+    // Export this scan's fresh matches. The scan above still stores successes
+    // to the DB (unless --no-save), so `vmate-cli recent` is updated as usual.
     if let Some(export_dir) = &args.export {
         let dest = vmate_core::paths::expand_path(export_dir);
         let result =
-            vmate_core::export::export_configs(repo.as_ref(), &settings.filter, &dest).await?;
+            vmate_core::export::export_configs_from_matches(&report.matched_configs, &dest).await?;
         println!(
             "Exported {} of {} configs to {}",
             result.exported,

@@ -43,7 +43,7 @@ impl ConfigRepo {
         Ok(())
     }
 
-    /// Current journal mode (used by `vmate doctor`).
+    /// Current journal mode (used by `vmate-cli doctor`).
     pub async fn journal_mode(&self) -> Result<String> {
         let row = sqlx::query("PRAGMA journal_mode")
             .fetch_one(&self.pool)

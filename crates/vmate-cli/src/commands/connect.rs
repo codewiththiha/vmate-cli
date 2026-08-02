@@ -1,4 +1,4 @@
-//! `vmate connect`: connect to a config with intelligent retry and skip.
+//! `vmate-cli connect`: connect to a config with intelligent retry and skip.
 
 use crate::cli::ConnectArgs;
 use crate::settings::Settings;

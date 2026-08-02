@@ -1,5 +1,6 @@
 //! Launching and monitoring OpenVPN processes.
 
+use crate::connect::ConnectHost;
 use crate::ovpn::monitor::{VpnLineClass, classify_line};
 use crate::system::killer::ProcessKiller;
 use anyhow::{Context, Result, anyhow};
@@ -180,10 +181,14 @@ pub async fn monitor_test(
 }
 
 /// Watch the handshake phase of a real connection.
+///
+/// Every line the process emits is forwarded to the host's verbose log, so the
+/// toggleable panel shows the handshake output (not just post-connect lines).
 pub async fn monitor_connect(
     lines: &mut mpsc::Receiver<String>,
     connect_timeout: Duration,
     cancel: CancellationToken,
+    host: &mut dyn ConnectHost,
 ) -> ConnectOutcome {
     let deadline = tokio::time::sleep(connect_timeout);
     tokio::pin!(deadline);
@@ -194,6 +199,9 @@ pub async fn monitor_connect(
             _ = cancel.cancelled() => return ConnectOutcome::Cancelled,
             line = lines.recv() => {
                 let Some(line) = line else { return ConnectOutcome::Exited };
+                // Feed the verbose log; a render failure must not abort the
+                // handshake, so the outcome is what matters.
+                let _ = host.log(&line).await;
                 match classify_line(&line) {
                     VpnLineClass::Success => return ConnectOutcome::Connected,
                     VpnLineClass::Error(kw) => return ConnectOutcome::Error(kw.to_string()),

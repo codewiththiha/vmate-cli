@@ -34,7 +34,6 @@ pub struct ScanOptions {
     pub workers: usize,
     pub modify: bool,
     pub backup: bool,
-    pub export: Option<PathBuf>,
     pub no_save: bool,
     pub filter: CountryFilter,
 }

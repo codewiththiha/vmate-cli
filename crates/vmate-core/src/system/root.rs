@@ -30,8 +30,8 @@ pub fn require_root_for(context: &str) -> Result<()> {
     let interactive = std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
     if !interactive {
         anyhow::bail!(
-            "vmate needs root to {context}.\n\
-             hint: run `sudo vmate ...`"
+            "vmate-cli needs root to {context}.\n\
+             hint: run `sudo vmate-cli ...`"
         );
     }
 
@@ -43,7 +43,7 @@ pub fn require_root_for(context: &str) -> Result<()> {
 /// This function never returns: the child runs under sudo and this process
 /// exits with its exit code.
 pub fn elevate_with_sudo() -> ! {
-    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("vmate"));
+    let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("vmate-cli"));
     let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
 
     let status = std::process::Command::new("sudo")

@@ -13,7 +13,7 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 #[test]
 fn recent_empty_db_is_graceful() {
     let (_dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["recent"])
         .env("VMATE_DB", &db)
         .assert()
@@ -24,7 +24,7 @@ fn recent_empty_db_is_graceful() {
 #[test]
 fn recent_empty_db_with_filter_mentions_filter() {
     let (_dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate").unwrap();
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["recent", "--filter", "kr"])
         .env("VMATE_DB", &db)
         .assert()
@@ -60,7 +60,7 @@ fn recent_plain_table_works_with_seeded_db() {
     )
     .unwrap();
 
-    Command::cargo_bin("vmate")
+    Command::cargo_bin("vmate-cli")
         .unwrap()
         .args(["scan", configs.to_str().unwrap(), "--no-killall"])
         .env("VMATE_DB", &db)
@@ -69,7 +69,7 @@ fn recent_plain_table_works_with_seeded_db() {
         .assert()
         .success();
 
-    let mut recent = Command::cargo_bin("vmate").unwrap();
+    let mut recent = Command::cargo_bin("vmate-cli").unwrap();
     recent
         .args(["recent", "--no-tui", "--filter", "jp"])
         .env("VMATE_DB", &db)

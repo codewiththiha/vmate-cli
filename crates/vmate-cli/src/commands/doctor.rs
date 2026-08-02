@@ -1,4 +1,4 @@
-//! `vmate doctor`: check the environment.
+//! `vmate-cli doctor`: check the environment.
 
 use crate::settings::Settings;
 use anyhow::Result;

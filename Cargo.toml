@@ -8,9 +8,9 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.85"
-version = "0.1.0"
+version = "1.0.0"
 license = "MIT"
-authors = ["Vmate contributors"]
+authors = ["codewiththiha"]
 
 [workspace.dependencies]
 # Async runtime
@@ -83,11 +83,12 @@ assert_cmd = "2"
 predicates = "3"
 
 [profile.release]
-# Size-optimized release build.
-opt-level = "s"
+# Maximal size optimization: smallest code, full LTO, single codegen unit,
+# fully stripped (no symbol table or debuginfo).
+opt-level = "z"
 lto = true
 codegen-units = 1
-strip = "symbols"
+strip = true
 
 # macOS 26+/27 dyld rejects dylibs whose LINKEDIT string pool is misaligned.
 # rustc < 1.96 with stripped debuginfo can emit such proc-macro dylibs

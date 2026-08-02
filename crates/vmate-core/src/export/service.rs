@@ -54,6 +54,26 @@ pub fn unique_destination(dest_dir: &Path, desired: &str) -> PathBuf {
     candidate
 }
 
+/// Copy a single config into `dest` with a country-prefixed, deduplicated name.
+///
+/// Returns whether the copy succeeded. A missing source or an IO error is
+/// logged and counted as not exported — never fatal.
+fn copy_config(src: &Path, country: &str, dest: &Path) -> bool {
+    let name = src
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("config.ovpn");
+    let desired = sanitize_filename(name, country);
+    let dst = unique_destination(dest, &desired);
+    match std::fs::copy(src, &dst) {
+        Ok(_) => true,
+        Err(e) => {
+            tracing::warn!(src = %src.display(), error = %e, "export copy failed");
+            false
+        }
+    }
+}
+
 /// Copy successful configs matching `filter` into `dest`.
 pub async fn export_configs(
     repo: &ConfigRepo,
@@ -68,22 +88,36 @@ pub async fn export_configs(
 
     let mut exported = 0;
     for config in &matched {
-        let src = Path::new(&config.path);
-        let name = src
-            .file_name()
-            .and_then(|s| s.to_str())
-            .unwrap_or("config.ovpn");
-        let desired = sanitize_filename(name, &config.country);
-        let dst = unique_destination(dest, &desired);
-        match std::fs::copy(src, &dst) {
-            Ok(_) => exported += 1,
-            Err(e) => tracing::warn!(src = %src.display(), error = %e, "export copy failed"),
+        if copy_config(Path::new(&config.path), &config.country, dest) {
+            exported += 1;
         }
     }
 
     Ok(ExportResult {
         exported,
         total: matched.len(),
+        dest: dest.to_path_buf(),
+    })
+}
+
+/// Copy freshly-scanned matches (a scan report's filtered successes) into `dest`.
+pub async fn export_configs_from_matches(
+    matches: &[crate::scan::ScanMatch],
+    dest: &Path,
+) -> Result<ExportResult> {
+    std::fs::create_dir_all(dest)
+        .with_context(|| format!("cannot create export directory {}", dest.display()))?;
+
+    let mut exported = 0;
+    for m in matches {
+        if copy_config(&m.path, m.country.as_str(), dest) {
+            exported += 1;
+        }
+    }
+
+    Ok(ExportResult {
+        exported,
+        total: matches.len(),
         dest: dest.to_path_buf(),
     })
 }

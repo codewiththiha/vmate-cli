@@ -1,4 +1,4 @@
-//! `vmate recent`: show previously successful configs.
+//! `vmate-cli recent`: show previously successful configs.
 
 use crate::cli::RecentArgs;
 use crate::settings::Settings;
@@ -21,7 +21,7 @@ pub async fn run(settings: &Settings, args: &RecentArgs) -> Result<()> {
 
     if entries.is_empty() {
         if settings.filter.is_empty() {
-            println!("No successful configs found. Run `vmate scan` first.");
+            println!("No successful configs found. Run `vmate-cli scan` first.");
         } else {
             println!("No successful configs matched filter: {}", settings.filter);
         }
@@ -41,6 +41,19 @@ pub async fn run(settings: &Settings, args: &RecentArgs) -> Result<()> {
         recent_ui::run(entries)?;
     } else {
         print_plain(&entries)?;
+    }
+
+    // Export previously-scanned configs matching the filter. Done after the
+    // list so the result line is visible once the TUI (if any) exits.
+    if let Some(export_dir) = &args.export {
+        let dest = vmate_core::paths::expand_path(export_dir);
+        let result = vmate_core::export::export_configs(&repo, &settings.filter, &dest).await?;
+        println!(
+            "Exported {} of {} configs to {}",
+            result.exported,
+            result.total,
+            result.dest.display()
+        );
     }
 
     Ok(())

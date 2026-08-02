@@ -1,6 +1,6 @@
 [package]
 name = "vmate-core"
-description = "Library of domain logic for vmate: scanning, testing, and connecting to OpenVPN configs."
+description = "Library of domain logic for vmate-cli: scanning, testing, and connecting to OpenVPN configs."
 edition.workspace = true
 rust-version.workspace = true
 version.workspace = true

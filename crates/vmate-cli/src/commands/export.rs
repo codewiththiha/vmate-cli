@@ -1,4 +1,4 @@
-//! `vmate export`: export successful configs.
+//! `vmate-cli export`: export successful configs.
 
 use crate::cli::ExportArgs;
 use crate::settings::Settings;

@@ -1,6 +1,6 @@
 //! Process killing.
 //!
-//! vmate intentionally runs `killall -9 openvpn` on connection switching and
+//! vmate-cli intentionally runs `killall -9 openvpn` on connection switching and
 //! shutdown — this is not an accident. The exact `killall -9 openvpn` form is
 //! preserved from the original Go tool.
 
@@ -47,7 +47,7 @@ pub fn killall_openvpn() -> Result<()> {
     }
 }
 
-/// Abstraction over the ways vmate kills processes.
+/// Abstraction over the ways vmate-cli kills processes.
 pub trait ProcessKiller: Send + Sync {
     fn kill_process_group(&self, pid: u32) -> Result<()>;
     fn killall_openvpn(&self) -> Result<()>;

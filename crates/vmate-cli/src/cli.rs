@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
-    name = "vmate",
+    name = "vmate-cli",
     version,
     about = "OpenVPN config scanner, tester and connector",
     long_about = None,
@@ -45,7 +45,7 @@ pub struct Cli {
 
     /// Disable the intentional `killall -9 openvpn` cleanup.
     ///
-    /// By default vmate intentionally kills all openvpn processes during
+    /// By default vmate-cli intentionally kills all openvpn processes during
     /// connection switching and shutdown.
     #[arg(long, global = true)]
     pub no_killall: bool,
@@ -174,6 +174,10 @@ pub struct RecentArgs {
     /// Copy the first entry's path immediately.
     #[arg(long)]
     pub copy_first: bool,
+
+    /// Also copy the listed configs to this directory.
+    #[arg(long)]
+    pub export: Option<PathBuf>,
 }
 
 #[derive(clap::Args)]

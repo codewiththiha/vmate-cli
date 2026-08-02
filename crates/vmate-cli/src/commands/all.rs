@@ -1,4 +1,4 @@
-//! `vmate all`: scan, store, then connect using only the filtered matches.
+//! `vmate-cli all`: scan, store, then connect using only the filtered matches.
 
 use crate::cli::AllArgs;
 use crate::settings::Settings;
@@ -47,7 +47,6 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
         workers: args.scan.max,
         modify: args.scan.modify,
         backup: args.scan.backup,
-        export: args.scan.export.clone(),
         no_save: args.scan.no_save,
         filter: settings.filter.clone(),
     };
@@ -78,6 +77,20 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     println!("Filter:   {}", report.filter);
     for m in &report.matched_configs {
         println!("{} -- {}", m.country, m.path.display());
+    }
+
+    // Export this scan's fresh matches (the scan already stored successes,
+    // so `vmate-cli recent` is updated as normal).
+    if let Some(export_dir) = &args.scan.export {
+        let dest = vmate_core::paths::expand_path(export_dir);
+        let result =
+            vmate_core::export::export_configs_from_matches(&report.matched_configs, &dest).await?;
+        println!(
+            "Exported {} of {} configs to {}",
+            result.exported,
+            result.total,
+            result.dest.display()
+        );
     }
 
     if args.no_connect {
