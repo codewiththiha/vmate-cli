@@ -11,7 +11,7 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 }
 
 #[test]
-fn connect_empty_history_is_graceful() {
+fn connect_empty_history_suggests_scan() {
     let (_dir, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["connect", "--no-killall"])
@@ -19,11 +19,12 @@ fn connect_empty_history_is_graceful() {
         .env("VMATE_NO_ELEVATE", "1")
         .assert()
         .success()
-        .stdout(predicate::str::contains("No connectable configs"));
+        .stdout(predicate::str::contains("No connectable configs"))
+        .stdout(predicate::str::contains("vmate-cli scan"));
 }
 
 #[test]
-fn connect_with_filter_empty_history_mentions_filter() {
+fn connect_with_filter_empty_history_mentions_filter_and_scan() {
     let (_dir, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
     cmd.args(["connect", "--filter", "jp", "--no-killall"])
@@ -33,7 +34,8 @@ fn connect_with_filter_empty_history_mentions_filter() {
         .success()
         .stdout(predicate::str::contains(
             "No connectable configs matched filter: JP",
-        ));
+        ))
+        .stdout(predicate::str::contains("vmate-cli scan"));
 }
 
 #[test]

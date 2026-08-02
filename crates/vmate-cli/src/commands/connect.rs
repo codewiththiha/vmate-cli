@@ -23,9 +23,16 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
 
     if queue.is_empty() {
         if settings.filter.is_empty() {
-            println!("No connectable configs found in history.");
+            println!(
+                "No connectable configs in history. Run `vmate-cli scan <dir>` to discover and store configs first."
+            );
         } else {
-            println!("No connectable configs matched filter: {}", settings.filter);
+            // CLI-friendly comma list without spaces for the suggested flag.
+            let filter_arg = settings.filter.to_display().replace(", ", ",");
+            println!(
+                "No connectable configs matched filter: {}. Run `vmate-cli scan <dir> --filter {filter_arg}` to find matching configs.",
+                settings.filter
+            );
         }
         return Ok(());
     }
