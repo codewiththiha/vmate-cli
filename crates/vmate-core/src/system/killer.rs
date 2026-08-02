@@ -7,6 +7,7 @@
 use anyhow::Result;
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
+use std::process::Stdio;
 use std::sync::Arc;
 
 /// SIGKILL the process group whose leader has the given pid.
@@ -22,22 +23,25 @@ pub fn kill_process_group(pid: u32) -> Result<()> {
 /// Run `killall -9 openvpn`.
 ///
 /// A non-zero exit status (e.g. "no processes matched") is normal and is
-/// logged rather than treated as an error.
+/// logged at trace level rather than treated as an error. stdout/stderr are
+/// redirected so killall's own messages never leak into the user's terminal.
 pub fn killall_openvpn() -> Result<()> {
-    let status = std::process::Command::new("killall")
+    let res = std::process::Command::new("killall")
         .arg("-9")
         .arg("openvpn")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status();
 
-    match status {
+    match res {
         Ok(status) => {
             if !status.success() {
-                tracing::debug!(%status, "killall -9 openvpn found no processes to kill");
+                tracing::trace!("killall -9 openvpn: no matching processes (normal)");
             }
             Ok(())
         }
         Err(e) => {
-            tracing::warn!(error = %e, "killall -9 openvpn failed");
+            tracing::warn!(error = %e, "killall -9 openvpn failed to start");
             Ok(())
         }
     }

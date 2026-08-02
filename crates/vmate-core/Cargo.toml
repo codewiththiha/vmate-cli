@@ -13,6 +13,7 @@ chrono.workspace = true
 directories.workspace = true
 hex.workspace = true
 nix.workspace = true
+parking_lot.workspace = true
 rand.workspace = true
 reqwest.workspace = true
 serde.workspace = true

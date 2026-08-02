@@ -52,6 +52,9 @@ directories = "5"
 shellexpand = "3"
 tempfile = "3"
 
+# Sync primitives (poison-free mutexes)
+parking_lot = "0.12"
+
 # Hashing
 sha2 = "0.10"
 hex = "0.4"

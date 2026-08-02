@@ -5,6 +5,7 @@ use anyhow::Result;
 use comfy_table::Table;
 use std::io::IsTerminal;
 use vmate_core::db::ConfigRepo;
+use vmate_core::db::models::ConfigStatus;
 use vmate_core::db::pool::init_pool;
 use vmate_core::system::is_root;
 
@@ -36,6 +37,14 @@ pub async fn run(settings: &Settings) -> Result<()> {
                     table.add_row(["WAL mode".to_string(), format!("error: {e}")]);
                 }
             }
+
+            let success = repo
+                .count_configs(ConfigStatus::Success)
+                .await
+                .unwrap_or(-1);
+            let failed = repo.count_configs(ConfigStatus::Failed).await.unwrap_or(-1);
+            table.add_row(["DB success count".to_string(), success.to_string()]);
+            table.add_row(["DB failed count".to_string(), failed.to_string()]);
         }
         Err(e) => {
             table.add_row([

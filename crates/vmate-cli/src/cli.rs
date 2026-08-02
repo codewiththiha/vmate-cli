@@ -152,10 +152,6 @@ pub struct ConnectArgs {
     )]
     pub cooldown: std::time::Duration,
 
-    /// Maximum retry cycles before giving up.
-    #[arg(long)]
-    pub max_retries: Option<u32>,
-
     /// Disable interactive key handling.
     #[arg(long)]
     pub no_interactive: bool,

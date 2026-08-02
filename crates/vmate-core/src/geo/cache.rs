@@ -1,8 +1,8 @@
 //! In-memory IP -> country memoization layered over the SQLite cache.
 
 use crate::country::CountryCode;
+use parking_lot::Mutex;
 use std::collections::HashMap;
-use std::sync::Mutex;
 
 /// A small per-session cache that avoids re-hitting SQLite (and the network)
 /// for the same IP within one scan.
@@ -17,12 +17,10 @@ impl GeoMemo {
     }
 
     pub fn get(&self, ip: &str) -> Option<CountryCode> {
-        self.inner.lock().ok()?.get(ip).cloned()
+        self.inner.lock().get(ip).cloned()
     }
 
     pub fn set(&self, ip: String, country: CountryCode) {
-        if let Ok(mut inner) = self.inner.lock() {
-            inner.insert(ip, country);
-        }
+        self.inner.lock().insert(ip, country);
     }
 }

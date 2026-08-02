@@ -1,38 +1,55 @@
-//! Connect-mode status UI.
+//! Connect-mode status UI, rendered with ratatui (same toolkit as `recent`).
 //!
-//! Renders a compact status block on an alternate screen and translates keys
-//! into [`UserCommand`]s for the connect service.
+//! Using ratatui avoids the raw-mode newline bug that plagues hand-rolled
+//! crossterm rendering: ratatui owns cursor positioning, so every line starts
+//! at column 0. `Ctrl+C` quits (in raw mode it arrives as a control-modified
+//! `c`, not SIGINT).
 
 use crate::ui::term::TuiGuard;
 use anyhow::Result;
 use async_trait::async_trait;
-use crossterm::cursor::MoveTo;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::execute;
-use crossterm::terminal::{Clear, ClearType, EnterAlternateScreen, enable_raw_mode};
+use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
+use ratatui::Terminal;
+use ratatui::backend::CrosstermBackend;
+use ratatui::layout::{Constraint, Layout};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Paragraph, Wrap};
 use std::collections::VecDeque;
-use std::io::Write;
+use std::io::Stdout;
 use std::time::{Duration, Instant};
 use vmate_core::connect::{ConnectHost, ConnectionStatus, UserCommand};
 
+type Term = Terminal<CrosstermBackend<Stdout>>;
+
 /// The connect-mode terminal host.
 pub struct ConnectTui {
-    connected: bool,
+    term: Term,
     connected_since: Option<Instant>,
     verbose: bool,
     no_interactive: bool,
     filter: String,
     status: ConnectionStatus,
-    log_buffer: VecDeque<String>,
+    log: VecDeque<String>,
     _guard: TuiGuard,
 }
 
 impl ConnectTui {
     pub fn new(no_interactive: bool, filter: String) -> Result<Self> {
         enable_raw_mode()?;
-        execute!(std::io::stdout(), EnterAlternateScreen)?;
+        // Held immediately so the terminal is restored even if a later step
+        // fails; moved into the struct once fully constructed.
+        let guard = TuiGuard;
+        execute!(
+            std::io::stdout(),
+            EnterAlternateScreen,
+            event::EnableMouseCapture
+        )?;
+        let term = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
         Ok(Self {
-            connected: false,
+            term,
             connected_since: None,
             verbose: false,
             no_interactive,
@@ -43,16 +60,16 @@ impl ConnectTui {
                 message: String::new(),
                 filter: String::new(),
             },
-            log_buffer: VecDeque::new(),
-            _guard: TuiGuard,
+            log: VecDeque::new(),
+            _guard: guard,
         })
     }
 
-    fn render(&self) -> Result<()> {
-        let mut out = std::io::stdout();
-        execute!(out, MoveTo(0, 0), Clear(ClearType::All))?;
-        let mut w = out.lock();
-
+    fn draw(&mut self) -> Result<()> {
+        let uptime = self
+            .connected_since
+            .map(|t| format_duration(t.elapsed()))
+            .unwrap_or_else(|| "00:00:00".to_string());
         let country = self
             .status
             .candidate
@@ -65,36 +82,95 @@ impl ConnectTui {
             .as_ref()
             .map(|c| c.path.as_str())
             .unwrap_or("-");
-
-        if self.connected {
-            let uptime = self
-                .connected_since
-                .map(|t| format_duration(t.elapsed()))
-                .unwrap_or_else(|| "00:00:00".to_string());
-            writeln!(w, "Connected: {country}")?;
-            writeln!(w, "Config:    {path}")?;
-            writeln!(w, "Uptime:    {uptime}")?;
+        let (state, color) = if self.status.connected {
+            ("Connected", Color::Green)
         } else {
-            writeln!(w, "Connecting: {country}")?;
-            writeln!(w, "Config:     {path}")?;
-        }
-        writeln!(w, "Filter:    {}", self.filter)?;
-        writeln!(w)?;
-        writeln!(w, "{}", self.status.message)?;
-        writeln!(w)?;
-        writeln!(
-            w,
-            "[n] next  [r] reconnect  [c] copy path  [v] verbose  [q] quit"
-        )?;
+            ("Connecting", Color::Yellow)
+        };
+        let filter = self.filter.clone();
+        let message = self.status.message.clone();
+        let verbose = self.verbose;
+        let log_text = if verbose {
+            self.log.iter().cloned().collect::<Vec<_>>().join("\n")
+        } else {
+            String::new()
+        };
 
-        if self.verbose {
-            writeln!(w)?;
-            writeln!(w, "--- OpenVPN output ---")?;
-            for line in &self.log_buffer {
-                writeln!(w, "{line}")?;
+        let body = vec![
+            Line::from(Span::styled(
+                format!("{state}: {country}"),
+                Style::default().fg(color).add_modifier(Modifier::BOLD),
+            )),
+            Line::from(format!("Config : {path}")),
+            Line::from(format!("Uptime : {uptime}")),
+            Line::from(format!("Filter : {filter}")),
+            Line::from(""),
+            Line::from(Span::styled(
+                message,
+                Style::default()
+                    .fg(Color::White)
+                    .add_modifier(Modifier::DIM),
+            )),
+        ];
+
+        self.term.draw(|f| {
+            let area = f.area();
+            let chunks = Layout::vertical([
+                Constraint::Min(3),
+                Constraint::Min(3),
+                Constraint::Length(1),
+            ])
+            .split(area);
+
+            f.render_widget(Paragraph::new(body), chunks[0]);
+
+            if verbose {
+                let log = Paragraph::new(log_text)
+                    .style(Style::default().fg(Color::DarkGray))
+                    .wrap(Wrap { trim: false });
+                f.render_widget(log, chunks[1]);
             }
-        }
-        w.flush()?;
+
+            let footer = Paragraph::new(Line::from(vec![
+                Span::styled(
+                    "[n]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" next  "),
+                Span::styled(
+                    "[r]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" reconnect  "),
+                Span::styled(
+                    "[c]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" copy  "),
+                Span::styled(
+                    "[v]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" verbose  "),
+                Span::styled(
+                    "[q]",
+                    Style::default()
+                        .fg(Color::Yellow)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::raw(" quit"),
+            ]))
+            .style(Style::default().add_modifier(Modifier::REVERSED));
+            f.render_widget(footer, chunks[2]);
+        })?;
         Ok(())
     }
 
@@ -106,16 +182,17 @@ impl ConnectTui {
             return None;
         }
         match event::read().ok()? {
-            Event::Key(key) if key.kind == KeyEventKind::Press => match key.code {
+            Event::Key(k) if k.kind == KeyEventKind::Press => match k.code {
+                // Ctrl+C quits (raw mode swallows SIGINT).
+                KeyCode::Char('c') if k.modifiers.contains(KeyModifiers::CONTROL) => {
+                    Some(UserCommand::Quit)
+                }
                 KeyCode::Char('n') => Some(UserCommand::Next),
                 KeyCode::Char('r') => Some(UserCommand::Reconnect),
                 KeyCode::Char('v') => Some(UserCommand::ToggleVerbose),
                 KeyCode::Char('?') => Some(UserCommand::Help),
-                KeyCode::Char('q') => Some(UserCommand::Quit),
-                KeyCode::Esc => Some(UserCommand::Quit),
-                KeyCode::Char('c') if !key.modifiers.contains(KeyModifiers::CONTROL) => {
-                    Some(UserCommand::CopyPath)
-                }
+                KeyCode::Char('q') | KeyCode::Esc => Some(UserCommand::Quit),
+                KeyCode::Char('c') => Some(UserCommand::CopyPath),
                 _ => None,
             },
             _ => None,
@@ -125,45 +202,39 @@ impl ConnectTui {
 
 #[async_trait]
 impl ConnectHost for ConnectTui {
-    async fn status(&mut self, status: &ConnectionStatus) -> Result<()> {
-        self.status = status.clone();
-        self.connected = status.connected;
-        if status.connected && self.connected_since.is_none() {
+    async fn status(&mut self, s: &ConnectionStatus) -> Result<()> {
+        if s.connected && self.connected_since.is_none() {
             self.connected_since = Some(Instant::now());
-        } else if !status.connected {
+        } else if !s.connected {
             self.connected_since = None;
         }
-        self.render()
+        self.status = s.clone();
+        self.draw()
     }
 
     async fn notify(&mut self, message: &str) -> Result<()> {
         self.status.message = message.to_string();
-        self.render()
+        self.draw()
     }
 
     async fn log(&mut self, line: &str) -> Result<()> {
-        self.log_buffer.push_back(line.to_string());
-        if self.log_buffer.len() > 200 {
-            self.log_buffer.pop_front();
+        self.log.push_back(line.to_string());
+        if self.log.len() > 200 {
+            self.log.pop_front();
         }
-        self.render()
+        self.draw()
     }
 
     async fn copy(&mut self, text: &str) -> Result<()> {
-        match crate::ui::clipboard::copy_to_clipboard(text) {
-            Ok(method) => {
-                self.status.message = format!("Copied: {text} ({method})");
-            }
-            Err(err) => {
-                self.status.message = format!("copy failed: {err}");
-            }
-        }
-        self.render()
+        self.status.message = match crate::ui::clipboard::copy_to_clipboard(text) {
+            Ok(method) => format!("Copied: {text} ({method})"),
+            Err(err) => format!("copy failed: {err}"),
+        };
+        self.draw()
     }
 
     async fn poll_command(&mut self) -> Option<UserCommand> {
-        // Re-render first so the uptime counter keeps ticking while idle.
-        let _ = self.render();
+        let _ = self.draw();
         self.read_key()
     }
 
@@ -173,11 +244,6 @@ impl ConnectHost for ConnectTui {
 }
 
 fn format_duration(d: Duration) -> String {
-    let total = d.as_secs();
-    format!(
-        "{:02}:{:02}:{:02}",
-        total / 3600,
-        (total % 3600) / 60,
-        total % 60
-    )
+    let s = d.as_secs();
+    format!("{:02}:{:02}:{:02}", s / 3600, (s % 3600) / 60, s % 60)
 }

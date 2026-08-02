@@ -112,7 +112,6 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
         connect_timeout: args.connect.connect_timeout,
         verbose: crate::app::is_verbose(verbose),
         killall_enabled: settings.killall_enabled,
-        max_retries: args.connect.max_retries,
     };
 
     let mut host = crate::ui::connect::ConnectTui::new(

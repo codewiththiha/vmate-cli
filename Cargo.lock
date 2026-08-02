@@ -3183,6 +3183,7 @@ dependencies = [
  "directories",
  "hex",
  "nix",
+ "parking_lot",
  "rand 0.8.7",
  "reqwest",
  "serde",

@@ -209,11 +209,11 @@ impl RecentApp {
         self.list_area = chunks[1];
 
         let title = if self.filter_input {
-            format!(" Recent Configs — filter: {}█", self.filter)
+            format!(" Recent Configs - filter: {}_", self.filter)
         } else if self.filter.is_empty() {
-            format!(" Recent Configs — {} entries", self.visible.len())
+            format!(" Recent Configs - {} entries", self.visible.len())
         } else {
-            format!(" Recent Configs — filter: {}", self.filter)
+            format!(" Recent Configs - filter: {}", self.filter)
         };
         frame.render_widget(
             Block::default().borders(Borders::BOTTOM).title(title),
@@ -256,8 +256,10 @@ impl RecentApp {
         frame.render_stateful_widget(list, chunks[1], &mut self.list_state);
 
         frame.render_widget(
-            Paragraph::new("Enter/click: copy path | c: copy | /: filter | ↑/↓: move | q: quit")
-                .style(Style::default().fg(Color::DarkGray)),
+            Paragraph::new(
+                "Enter/click: copy path | c: copy | /: filter | up/down: move | q: quit",
+            )
+            .style(Style::default().fg(Color::DarkGray)),
             chunks[2],
         );
 

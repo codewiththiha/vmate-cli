@@ -11,9 +11,10 @@ use crate::ovpn::process::{VpnTester, discover_configs};
 use crate::paths;
 use crate::scan::report::{ScanMatch, ScanOptions, ScanProgress, ScanReport};
 use anyhow::{Context, Result};
+use parking_lot::Mutex;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 use tokio_util::sync::CancellationToken;
@@ -151,7 +152,7 @@ impl ScanService {
                 progress.success(&path, &lookup.country);
 
                 if filter.matches(lookup.country.as_str()) {
-                    let mut results = results.lock().unwrap_or_else(|e| e.into_inner());
+                    let mut results = results.lock();
                     if results.len() < limit {
                         results.push(ScanMatch {
                             path,
@@ -174,7 +175,7 @@ impl ScanService {
         }
 
         let mut matched_configs = {
-            let mut results = results.lock().unwrap_or_else(|e| e.into_inner());
+            let mut results = results.lock();
             std::mem::take(&mut *results)
         };
         matched_configs.sort_by(|a, b| a.path.cmp(&b.path));

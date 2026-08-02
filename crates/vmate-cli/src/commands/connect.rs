@@ -41,7 +41,6 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
         connect_timeout: args.connect_timeout,
         verbose: crate::app::is_verbose(verbose),
         killall_enabled: settings.killall_enabled,
-        max_retries: args.max_retries,
     };
 
     let mut host =
