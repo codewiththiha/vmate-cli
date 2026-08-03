@@ -33,7 +33,7 @@ fn scan_configs(dir: &Path, configs: &Path) -> PathBuf {
     let db = dir.join("vmate.db");
     let fake = write_fake_openvpn(dir);
     let mut scan = Command::cargo_bin("vmate-cli").unwrap();
-    scan.args(["scan", configs.to_str().unwrap(), "--no-killall"])
+    scan.args(["scan", configs.to_str().unwrap()])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .env("VMATE_OPENVPN_BIN", fake.to_str().unwrap())
@@ -72,7 +72,6 @@ fn scan_export_copies_fresh_matches_and_updates_recent() {
         "jp",
         "--export",
         out.to_str().unwrap(),
-        "--no-killall",
     ])
     .env("VMATE_DB", &db)
     .env("VMATE_NO_ELEVATE", "1")

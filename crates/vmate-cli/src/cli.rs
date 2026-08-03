@@ -43,12 +43,10 @@ pub struct Cli {
     )]
     pub openvpn_bin: String,
 
-    /// Disable the intentional `killall -9 openvpn` cleanup.
-    ///
-    /// By default vmate-cli intentionally kills all openvpn processes during
-    /// connection switching and shutdown.
+    /// Also run `killall -9 openvpn` on shutdown/switch. Default is per-process
+    /// cleanup of only the openvpn processes vmate spawned.
     #[arg(long, global = true)]
-    pub no_killall: bool,
+    pub killall: bool,
 
     /// ipinfo.io API token.
     #[arg(long, global = true, env = "IPINFO_TOKEN")]

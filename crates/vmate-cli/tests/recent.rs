@@ -62,7 +62,7 @@ fn recent_plain_table_works_with_seeded_db() {
 
     Command::cargo_bin("vmate-cli")
         .unwrap()
-        .args(["scan", configs.to_str().unwrap(), "--no-killall"])
+        .args(["scan", configs.to_str().unwrap()])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .env("VMATE_OPENVPN_BIN", fake.to_str().unwrap())

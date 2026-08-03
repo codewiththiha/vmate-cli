@@ -5,10 +5,11 @@ the command line. It finds `.ovpn` files on disk, tests them concurrently,
 remembers which ones work, and lets you connect, switch and copy configs — all
 from a keyboard-driven terminal UI backed by SQLite.
 
-> **⚠️ Note:** vmate-cli intentionally runs `killall -9 openvpn` during
-> connection switching and shutdown. This is a deliberate cleanup strategy, not
-> a bug. Use `--no-killall` to disable the global sweep (per-process kills still
-> happen).
+> **⚠️ Note:** by default vmate-cli cleans up only the OpenVPN processes it
+> spawned: each process group is sent SIGTERM, given a grace period, then
+> SIGKILLed if needed. Pass `--killall` to also run the `killall -9 openvpn`
+> sweep (the behavior of the original Go tool) during connection switching and
+> shutdown.
 
 ---
 
@@ -33,7 +34,7 @@ from a keyboard-driven terminal UI backed by SQLite.
 - Root/sudo for `scan`, `connect` and `all` (vmate-cli re-executes under `sudo`
   automatically on an interactive terminal; set `VMATE_NO_ELEVATE=1` to run
   without elevation — OpenVPN will likely fail)
-- `killall` for the intentional global OpenVPN cleanup
+- `killall` (optional) only if you pass `--killall` for the global OpenVPN sweep
 
 ## Build & Test
 
@@ -57,7 +58,7 @@ attaches a zip per platform (`vmate-cli-<version>-<target>.zip`):
 | `aarch64-unknown-linux-gnu` | Linux arm64 | Pi, AWS Graviton, etc. |
 
 Windows is not shipped — vmate-cli is Unix-only (process groups, root checks,
-`killall`).
+`killall` when `--killall` is used).
 
 Download and extract a zip, then install the binary to your PATH:
 
@@ -90,7 +91,7 @@ These apply to every subcommand:
 | `-f, --filter <COUNTRY>` | Filter by country code, e.g. `jp,kr`. Repeatable. |
 | `--db <PATH>` | Path to the SQLite database (default `~/.config/vmate-cli/vmate.db`). |
 | `--openvpn-bin <BIN>` | OpenVPN binary to use (default `openvpn`). |
-| `--no-killall` | Disable the global `killall -9 openvpn` cleanup. |
+| `--killall` | Also run `killall -9 openvpn` on shutdown/switch. Default is per-process cleanup of only the openvpn processes vmate spawned. |
 | `--ipinfo-token <TOKEN>` | ipinfo.io API token (defaults to a bundled free token). |
 | `-v, -vv, -q` | Verbosity / quiet logging. |
 | `-h, --help` | Print help. |
@@ -279,8 +280,9 @@ is being established or switched. When a config is removed after repeated
 failures, a `removed <file> from recent list` notice is shown briefly, and the
 Config line shows the `.ovpn` file name (not the full path).
 
-Pressing `n` kills the current OpenVPN process group, runs `killall -9 openvpn`
-(when enabled), marks the config as skipped (it is **not** deleted from history),
+Pressing `n` gracefully kills the current OpenVPN process group (SIGTERM, then
+SIGKILL after the grace period), runs `killall -9 openvpn` too when `--killall`
+is enabled, marks the config as skipped (it is **not** deleted from history),
 and moves it to the end of a shuffled deferred queue.
 
 ## Export

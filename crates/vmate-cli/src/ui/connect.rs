@@ -274,7 +274,10 @@ impl ConnectHost for ConnectTui {
             // notices survive the switch and keep riding out their TTL.
             if matches!(
                 self.transient,
-                Some(Transient { kind: TransientKind::Connected, .. })
+                Some(Transient {
+                    kind: TransientKind::Connected,
+                    ..
+                })
             ) {
                 self.transient = None;
             }

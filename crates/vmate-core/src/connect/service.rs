@@ -158,8 +158,7 @@ impl ConnectService {
                                 // history. A crash right after the handshake is
                                 // connect-then-crash flakiness and still counts —
                                 // resetting there would retry it forever.
-                                if connected_at.elapsed() >= self.options.connect_stability_grace
-                                {
+                                if connected_at.elapsed() >= self.options.connect_stability_grace {
                                     failures = 0;
                                 }
                                 let _ = self

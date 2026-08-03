@@ -77,6 +77,10 @@ pub fn spawn_openvpn(bin: &str, args: &[String]) -> Result<OpenVpnHandle> {
         .spawn()
         .with_context(|| format!("failed to spawn OpenVPN binary: {bin}"))?;
 
+    // Track the pid so the cleanup guard can kill exactly the processes vmate
+    // spawned (a pid of 0 — unknown — is ignored by the registry).
+    crate::system::killer::register_process(child.id().unwrap_or(0));
+
     let stdout = child
         .stdout
         .take()
@@ -240,9 +244,9 @@ pub async fn test_openvpn_config(
 
     let outcome = monitor_test(&mut handle.lines, timeout, cancel).await;
 
-    // Always clean up the process group; never leak workers.
-    let _ = killer.kill_process_group(pid);
-    let _ = handle.child.wait().await;
+    // Always clean up the process group; never leak workers. Graceful: SIGTERM
+    // the group, then SIGKILL only if it is still alive after KILL_GRACE.
+    crate::system::killer::kill_process_tree_graceful(killer, pid, &mut handle.child).await;
 
     Ok(matches!(outcome, MonitorOutcome::Success))
 }
@@ -279,6 +283,7 @@ impl VpnTester for RealVpnTester {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::system::killer::RealProcessKiller;
 
     #[test]
     fn test_args_include_safety_flags() {
@@ -288,5 +293,30 @@ mod tests {
         assert!(args.iter().any(|a| a == "--nobind"));
         assert!(args.iter().any(|a| a == "--auth-nocache"));
         assert!(args.iter().any(|a| a == "/tmp/a.ovpn"));
+    }
+
+    /// A SIGTERM to the process group must end the child quickly — no need to
+    /// wait out the SIGKILL escalation.
+    #[tokio::test]
+    async fn kill_process_tree_graceful_sigterms_and_exits_quickly() {
+        crate::system::killer::clear_registry();
+        let mut handle = spawn_openvpn("sh", &["-c".into(), "sleep 5".into()]).unwrap();
+        let pid = handle.child.id().unwrap_or(0);
+        assert!(pid != 0);
+
+        let killer = RealProcessKiller {
+            killall_enabled: false,
+        };
+        let start = std::time::Instant::now();
+        tokio::time::timeout(
+            Duration::from_secs(2),
+            crate::system::killer::kill_process_tree_graceful(&killer, pid, &mut handle.child),
+        )
+        .await
+        .expect("graceful kill must not hang");
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "SIGTERM path should exit well under the KILL_GRACE window"
+        );
     }
 }

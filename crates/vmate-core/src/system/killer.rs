@@ -1,17 +1,80 @@
 //! Process killing.
 //!
-//! vmate-cli intentionally runs `killall -9 openvpn` on connection switching and
-//! shutdown — this is not an accident. The exact `killall -9 openvpn` form is
-//! preserved from the original Go tool.
+//! vmate-cli tracks every OpenVPN process it spawns in a process-global PID
+//! registry and, by default, cleans up exactly those processes on connection
+//! switching and shutdown: SIGTERM the process group, wait a grace period, then
+//! SIGKILL anything still alive. The exact `killall -9 openvpn` form preserved
+//! from the original Go tool is now opt-in via `--killall` and only runs in
+//! addition to the per-process cleanup.
 
 use anyhow::Result;
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use std::process::Stdio;
 use std::sync::Arc;
+use std::sync::{LazyLock, Mutex};
+use std::time::Duration;
 
-/// SIGKILL the process group whose leader has the given pid.
+/// Grace period between SIGTERM and SIGKILL when killing a process tree.
+pub const KILL_GRACE: Duration = Duration::from_secs(3);
+
+/// PIDs of every OpenVPN process vmate-cli has spawned this run.
+///
+/// The registry is the default cleanup source: `CleanupGuard` kills exactly
+/// these processes on drop, never the user's unrelated OpenVPN instances.
+static REGISTRY: LazyLock<Mutex<Vec<u32>>> = LazyLock::new(|| Mutex::new(Vec::new()));
+
+/// Record a spawned process pid so the cleanup guard can kill it on the way
+/// out. A pid of 0 (unknown) is ignored.
+pub fn register_process(pid: u32) {
+    if pid == 0 {
+        return;
+    }
+    REGISTRY.lock().unwrap().push(pid);
+}
+
+/// Snapshot of the currently registered pids.
+pub fn registered_pids() -> Vec<u32> {
+    REGISTRY.lock().unwrap().clone()
+}
+
+/// Forget every registered pid without killing anything.
+pub fn clear_registry() {
+    REGISTRY.lock().unwrap().clear();
+}
+
+/// Kill every registered process group: SIGTERM all of them, allow one grace
+/// period, then SIGKILL anything still alive, and finally clear the registry.
+///
+/// Sync and best-effort: individual kill errors are ignored, and the grace
+/// period is a fixed sleep because there is no live handle to wait on. This is
+/// the last-resort safety net used by `CleanupGuard::drop`.
+pub fn kill_all_spawned() {
+    let pids = registered_pids();
+    for &pid in &pids {
+        let _ = kill_process_group(pid);
+    }
+    std::thread::sleep(Duration::from_secs(1));
+    for &pid in &pids {
+        let _ = force_kill_process_group(pid);
+    }
+    clear_registry();
+}
+
+/// SIGTERM the process group whose leader has the given pid. The child is
+/// given the chance to shut down gracefully before a SIGKILL follows.
 pub fn kill_process_group(pid: u32) -> Result<()> {
+    if pid == 0 {
+        return Ok(());
+    }
+    let pgid = -(pid as i32);
+    kill(Pid::from_raw(pgid), Signal::SIGTERM)
+        .map_err(|e| anyhow::anyhow!("failed to signal process group {pid}: {e}"))
+}
+
+/// SIGKILL the process group whose leader has the given pid. Escalation used
+/// after the SIGTERM grace period has elapsed.
+pub fn force_kill_process_group(pid: u32) -> Result<()> {
     if pid == 0 {
         return Ok(());
     }
@@ -49,14 +112,18 @@ pub fn killall_openvpn() -> Result<()> {
 
 /// Abstraction over the ways vmate-cli kills processes.
 pub trait ProcessKiller: Send + Sync {
+    /// SIGTERM the process group. Implementations delegate to the free
+    /// function unless they are test fakes.
     fn kill_process_group(&self, pid: u32) -> Result<()>;
+    /// SIGKILL the process group (escalation after the SIGTERM grace period).
+    fn force_kill_process_group(&self, pid: u32) -> Result<()>;
     fn killall_openvpn(&self) -> Result<()>;
 }
 
 /// Production killer.
 ///
-/// Global `killall -9 openvpn` can be disabled with `--no-killall`; per-process
-/// group kills always happen.
+/// Global `killall -9 openvpn` is opt-in via `--killall`; per-process group
+/// kills always happen.
 pub struct RealProcessKiller {
     pub killall_enabled: bool,
 }
@@ -64,6 +131,10 @@ pub struct RealProcessKiller {
 impl ProcessKiller for RealProcessKiller {
     fn kill_process_group(&self, pid: u32) -> Result<()> {
         kill_process_group(pid)
+    }
+
+    fn force_kill_process_group(&self, pid: u32) -> Result<()> {
+        force_kill_process_group(pid)
     }
 
     fn killall_openvpn(&self) -> Result<()> {
@@ -74,10 +145,28 @@ impl ProcessKiller for RealProcessKiller {
     }
 }
 
-/// RAII guard that runs `killall -9 openvpn` on drop.
+/// Kill a process tree gracefully: SIGTERM the group, wait up to [`KILL_GRACE`]
+/// for the child to exit, then SIGKILL the group if it is still alive.
+pub async fn kill_process_tree_graceful(
+    killer: &dyn ProcessKiller,
+    pid: u32,
+    child: &mut tokio::process::Child,
+) {
+    let _ = killer.kill_process_group(pid);
+    if tokio::time::timeout(KILL_GRACE, child.wait())
+        .await
+        .is_err()
+    {
+        let _ = killer.force_kill_process_group(pid);
+        let _ = child.wait().await;
+    }
+}
+
+/// RAII guard that cleans up every spawned OpenVPN process on drop.
 ///
 /// This is the safety net that guarantees no stale OpenVPN processes survive
-/// vmate, even on panic or error paths.
+/// vmate, even on panic or error paths: the per-process registry is killed
+/// first, and the opt-in global `killall -9 openvpn` sweep runs afterwards.
 pub struct CleanupGuard {
     killer: Arc<dyn ProcessKiller>,
     enabled: bool,
@@ -88,15 +177,18 @@ impl CleanupGuard {
         Self { killer, enabled }
     }
 
-    /// Prevent the guard from killing anything on drop.
+    /// Prevent the guard from killing anything on drop. The process registry is
+    /// cleared so the guard leaves no stale pids behind.
     pub fn disarm(&mut self) {
         self.enabled = false;
+        clear_registry();
     }
 }
 
 impl Drop for CleanupGuard {
     fn drop(&mut self) {
         if self.enabled {
+            kill_all_spawned();
             let _ = self.killer.killall_openvpn();
         }
     }
@@ -110,6 +202,9 @@ mod tests {
 
     impl ProcessKiller for NoopKiller {
         fn kill_process_group(&self, _pid: u32) -> Result<()> {
+            Ok(())
+        }
+        fn force_kill_process_group(&self, _pid: u32) -> Result<()> {
             Ok(())
         }
         fn killall_openvpn(&self) -> Result<()> {
@@ -128,5 +223,51 @@ mod tests {
     #[test]
     fn zero_pid_group_kill_is_a_noop() {
         assert!(kill_process_group(0).is_ok());
+        assert!(force_kill_process_group(0).is_ok());
+    }
+
+    #[test]
+    fn registry_registers_and_clears() {
+        clear_registry();
+        register_process(0); // ignored
+        register_process(1234);
+        register_process(5678);
+        let pids = registered_pids();
+        assert!(!pids.contains(&0));
+        assert!(pids.contains(&1234));
+        assert!(pids.contains(&5678));
+        clear_registry();
+        assert!(registered_pids().is_empty());
+    }
+
+    /// A real (now-reaped) pid and a large pid that no process group can own
+    /// must be safe for `kill_all_spawned` to sweep: errors are ignored, the
+    /// registry is cleared, and nothing is left behind.
+    #[tokio::test]
+    async fn kill_all_spawned_ignores_dead_pids_and_clears() {
+        clear_registry();
+        let mut child = tokio::process::Command::new("sh")
+            .arg("-c")
+            .arg("exit 0")
+            .spawn()
+            .unwrap();
+        let dead_pid = child.id().unwrap();
+        child.wait().await.unwrap();
+        register_process(dead_pid);
+        register_process(999_999_999);
+
+        kill_all_spawned();
+
+        assert!(registered_pids().is_empty());
+    }
+
+    #[test]
+    fn real_killer_delegates_and_zero_pid_is_noop() {
+        let killer = RealProcessKiller {
+            killall_enabled: false,
+        };
+        assert!(killer.kill_process_group(0).is_ok());
+        assert!(killer.force_kill_process_group(0).is_ok());
+        assert!(killer.killall_openvpn().is_ok()); // disabled -> no-op
     }
 }

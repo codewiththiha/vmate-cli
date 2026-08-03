@@ -17,24 +17,19 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 fn scan_empty_dir_succeeds() {
     let (dir, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args([
-        "scan",
-        dir.path().to_str().unwrap(),
-        "--no-save",
-        "--no-killall",
-    ])
-    .env("VMATE_DB", &db)
-    .env("VMATE_NO_ELEVATE", "1")
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Found matched: 0"));
+    cmd.args(["scan", dir.path().to_str().unwrap(), "--no-save"])
+        .env("VMATE_DB", &db)
+        .env("VMATE_NO_ELEVATE", "1")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Found matched: 0"));
 }
 
 #[test]
 fn scan_missing_dir_fails_cleanly() {
     let (_, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["scan", "/nonexistent/vmate-test-dir", "--no-killall"])
+    cmd.args(["scan", "/nonexistent/vmate-test-dir"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .assert()
@@ -74,7 +69,7 @@ fn scan_stores_and_reports_successes() {
     .unwrap();
 
     let mut scan = Command::cargo_bin("vmate-cli").unwrap();
-    scan.args(["scan", configs.to_str().unwrap(), "--no-killall"])
+    scan.args(["scan", configs.to_str().unwrap()])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .env("VMATE_OPENVPN_BIN", fake.to_str().unwrap())
@@ -127,20 +122,14 @@ fn scan_filter_limits_reported_matches() {
     }
 
     let mut scan = Command::cargo_bin("vmate-cli").unwrap();
-    scan.args([
-        "scan",
-        configs.to_str().unwrap(),
-        "--filter",
-        "jp",
-        "--no-killall",
-    ])
-    .env("VMATE_DB", &db)
-    .env("VMATE_NO_ELEVATE", "1")
-    .env("VMATE_OPENVPN_BIN", fake.to_str().unwrap())
-    .assert()
-    .success()
-    .stdout(predicate::str::contains("Found matched: 1"))
-    .stdout(predicate::str::contains("Found total:   3"))
-    .stdout(predicate::str::contains("vpngate_jp.ovpn"))
-    .stdout(predicate::str::contains("vpngate_us.ovpn").not());
+    scan.args(["scan", configs.to_str().unwrap(), "--filter", "jp"])
+        .env("VMATE_DB", &db)
+        .env("VMATE_NO_ELEVATE", "1")
+        .env("VMATE_OPENVPN_BIN", fake.to_str().unwrap())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Found matched: 1"))
+        .stdout(predicate::str::contains("Found total:   3"))
+        .stdout(predicate::str::contains("vpngate_jp.ovpn"))
+        .stdout(predicate::str::contains("vpngate_us.ovpn").not());
 }

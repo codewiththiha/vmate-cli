@@ -85,9 +85,9 @@ pub async fn run(settings: &Settings) -> Result<()> {
     table.add_row([
         "killall -9 openvpn".to_string(),
         if settings.killall_enabled {
-            "enabled"
+            "enabled (--killall)"
         } else {
-            "disabled (--no-killall)"
+            "disabled (per-process cleanup)"
         }
         .to_string(),
     ]);

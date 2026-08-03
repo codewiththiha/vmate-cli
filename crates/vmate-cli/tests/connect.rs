@@ -14,7 +14,7 @@ fn tmp_db() -> (tempfile::TempDir, PathBuf) {
 fn connect_empty_history_suggests_scan() {
     let (_dir, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["connect", "--no-killall"])
+    cmd.args(["connect"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .assert()
@@ -27,7 +27,7 @@ fn connect_empty_history_suggests_scan() {
 fn connect_with_filter_empty_history_mentions_filter_and_scan() {
     let (_dir, db) = tmp_db();
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["connect", "--filter", "jp", "--no-killall"])
+    cmd.args(["connect", "--filter", "jp"])
         .env("VMATE_DB", &db)
         .env("VMATE_NO_ELEVATE", "1")
         .assert()
@@ -51,7 +51,6 @@ fn connect_strict_filter_rejects_non_matching_explicit_config() {
         "--filter",
         "jp",
         "--strict-filter",
-        "--no-killall",
     ])
     .env("VMATE_DB", &db)
     .env("VMATE_NO_ELEVATE", "1")

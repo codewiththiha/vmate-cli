@@ -33,7 +33,7 @@ impl Settings {
         Ok(Settings {
             db_path,
             openvpn_bin: cli.openvpn_bin.clone(),
-            killall_enabled: !cli.no_killall,
+            killall_enabled: cli.killall,
             ipinfo_token: cli.ipinfo_token.clone(),
             filter,
         })
