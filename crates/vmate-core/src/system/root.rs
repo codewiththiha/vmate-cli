@@ -13,16 +13,16 @@ pub fn is_root() -> bool {
 /// Ensure the process has root privileges for `context`.
 ///
 /// * Already root → returns.
-/// * `VMATE_NO_ELEVATE` set → warns and proceeds (OpenVPN will likely fail;
-///   this is the escape hatch used by tests and CI).
+/// * `no_elevate` is set or `VMATE_NO_ELEVATE` is set → warns and proceeds
+///   (OpenVPN will likely fail; this is the escape hatch used by tests and CI).
 /// * Interactive TTY → transparently re-executes under `sudo`.
 /// * Otherwise → returns an error explaining how to run elevated.
-pub fn require_root_for(context: &str) -> Result<()> {
+pub fn require_root_for(context: &str, no_elevate: bool) -> Result<()> {
     if is_root() {
         return Ok(());
     }
 
-    if std::env::var_os("VMATE_NO_ELEVATE").is_some() {
+    if no_elevate || std::env::var_os("VMATE_NO_ELEVATE").is_some() {
         tracing::warn!("running without root privileges to {context}; OpenVPN will likely fail");
         return Ok(());
     }

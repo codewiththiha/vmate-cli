@@ -12,6 +12,7 @@ pub struct Settings {
     pub db_path: PathBuf,
     pub openvpn_bin: String,
     pub killall_enabled: bool,
+    pub no_elevate: bool,
     pub ipinfo_token: Option<String>,
     pub filter: CountryFilter,
 }
@@ -34,6 +35,7 @@ impl Settings {
             db_path,
             openvpn_bin: cli.openvpn_bin.clone(),
             killall_enabled: cli.killall,
+            no_elevate: cli.no_elevate,
             ipinfo_token: cli.ipinfo_token.clone(),
             filter,
         })

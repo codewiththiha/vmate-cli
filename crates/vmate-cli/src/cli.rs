@@ -48,6 +48,10 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub killall: bool,
 
+    /// Don't re-execute under sudo; run with current privileges (OpenVPN will likely fail).
+    #[arg(long, global = true)]
+    pub no_elevate: bool,
+
     /// ipinfo.io API token.
     #[arg(long, global = true, env = "IPINFO_TOKEN")]
     pub ipinfo_token: Option<String>,

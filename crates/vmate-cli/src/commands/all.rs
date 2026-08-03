@@ -18,7 +18,7 @@ use vmate_core::system::{
 };
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
-    require_root_for("run OpenVPN tests and connections")?;
+    require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
     let pool = init_pool(&settings.db_path).await?;
     let repo = Arc::new(ConfigRepo::new(pool));

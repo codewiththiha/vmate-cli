@@ -92,6 +92,7 @@ These apply to every subcommand:
 | `--db <PATH>` | Path to the SQLite database (default `~/.config/vmate-cli/vmate.db`). |
 | `--openvpn-bin <BIN>` | OpenVPN binary to use (default `openvpn`). |
 | `--killall` | Also run `killall -9 openvpn` on shutdown/switch. Default is per-process cleanup of only the openvpn processes vmate spawned. |
+| `--no-elevate` | Don't re-execute under sudo; run with current privileges (OpenVPN will likely fail). |
 | `--ipinfo-token <TOKEN>` | ipinfo.io API token (defaults to a bundled free token). |
 | `-v, -vv, -q` | Verbosity / quiet logging. |
 | `-h, --help` | Print help. |
