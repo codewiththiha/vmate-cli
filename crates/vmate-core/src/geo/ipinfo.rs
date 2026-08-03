@@ -9,9 +9,16 @@
 use crate::country::CountryCode;
 use reqwest::Client;
 
-/// Free ipinfo.io token, taken verbatim from the original Go vmate-cli so
-/// country lookup works out of the box. Override with `--ipinfo-token` or
-/// `IPINFO_TOKEN`.
+/// Shared free-tier ipinfo.io token, taken verbatim from the original Go
+/// vmate-cli so country lookup works out of the box.
+///
+/// Every vmate-cli user who does not supply their own token uses this same
+/// token, so it is subject to the ipinfo.io free tier's rate limits and is
+/// not suitable for privacy-sensitive use: client IPs are sent to ipinfo.io
+/// whenever geo lookup falls back to it.
+///
+/// Override with `--ipinfo-token` or the `IPINFO_TOKEN` environment variable
+/// to use your own token.
 pub const DEFAULT_IPINFO_TOKEN: &str = "44936a1f60206d";
 
 /// Response shape for `https://api.ipinfo.io/lite/{ip}`.

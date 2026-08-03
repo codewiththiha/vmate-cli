@@ -109,10 +109,20 @@ impl GeoLocator for IpInfoGeoLocator {
 impl IpInfoGeoLocator {
     /// Build a locator with a per-session in-memory memo layered over SQLite.
     ///
-    /// When no token is supplied the free token from the original Go tool is
-    /// used, so country lookup works without any configuration.
+    /// When no token is supplied the shared free token from the original Go
+    /// tool is used, so country lookup works without any configuration. This
+    /// emits a one-time warning at construction so the fallback is visible.
     pub fn new(repo: Arc<ConfigRepo>, token: Option<String>) -> Self {
-        let token = token.or_else(|| Some(ipinfo::DEFAULT_IPINFO_TOKEN.to_string()));
+        let token = match token {
+            Some(token) => Some(token),
+            None => {
+                tracing::warn!(
+                    "using the shared ipinfo.io free token; client IPs are sent to ipinfo.io. \
+                     Set --ipinfo-token or IPINFO_TOKEN to use your own."
+                );
+                Some(ipinfo::DEFAULT_IPINFO_TOKEN.to_string())
+            }
+        };
         Self {
             client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(5))

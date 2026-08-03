@@ -254,8 +254,11 @@ Each config is tagged with a country using, in order:
 2. **IP cache** — the remote host is resolved and looked up in the SQLite cache.
 3. **Geo IP API** — a lookup against ipinfo.io, persisted to the cache.
 
-A free token is bundled, so country detection works with no configuration.
-Override it with `--ipinfo-token` or the `IPINFO_TOKEN` environment variable.
+By default vmate sends client IPs to ipinfo.io under a shared free-tier token,
+so country detection works with no configuration. That shared token is
+rate-limited and shared across all vmate-cli users — for privacy-sensitive
+setups, provide your own token with `--ipinfo-token` or the `IPINFO_TOKEN`
+environment variable (a warning is emitted when the shared token is in use).
 Failures degrade to `UNKNOWN` — geo lookup never aborts a scan.
 
 ## Connect keys
