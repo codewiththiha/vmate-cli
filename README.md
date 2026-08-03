@@ -165,40 +165,40 @@ Checks for OpenVPN, root access, and database health.
 
 #### `completions` — shell completion scripts
 
-`vmate-cli` can generate completion scripts for bash, zsh and fish — either
-printed to stdout so you can capture them, or installed automatically:
+`vmate-cli` installs completion scripts for bash, zsh and fish into the
+standard location for each shell, then prints how to activate them:
 
 ```bash
-# Print the script (capture it yourself)
 vmate-cli completions bash
 vmate-cli completions zsh
 vmate-cli completions fish
-
-# Install it to the standard location and print activation steps
-vmate-cli completions bash --install
-vmate-cli completions zsh --install
-vmate-cli completions fish --install
 ```
 
-`--install` writes the script where your shell already looks (for zsh it
-prefers a Homebrew `zsh-completions` dir already on `$fpath`, falling back to
-`~/.zfunc`), then tells you what to do to activate it. If you installed the
-script with a specific shell manually, the equivalent one-liners are:
+For zsh it prefers a Homebrew `zsh-completions` dir already on `$fpath`
+(falling back to `~/.zfunc`). After installing, restart your shell — or just
+run `compinit` in zsh to pick it up immediately.
+
+If you need the raw script (for example to capture it into a dotfiles repo),
+use `--print`:
+
+```bash
+vmate-cli completions zsh --print > _vmate-cli
+```
+
+Manual one-liners, if you prefer to place the script yourself:
 
 ```bash
 # bash
-echo 'source <(vmate-cli completions bash)' >> ~/.bashrc
+echo 'source <(vmate-cli completions bash --print)' >> ~/.bashrc
 
 # zsh (with fpath + compinit)
-mkdir -p ~/.zfunc && vmate-cli completions zsh > ~/.zfunc/_vmate-cli
+mkdir -p ~/.zfunc && vmate-cli completions zsh --print > ~/.zfunc/_vmate-cli
 echo 'fpath=(~/.zfunc $fpath); autoload -Uz compinit && compinit' >> ~/.zshrc
 
 # fish
 mkdir -p ~/.config/fish/completions
-vmate-cli completions fish > ~/.config/fish/completions/vmate-cli.fish
+vmate-cli completions fish --print > ~/.config/fish/completions/vmate-cli.fish
 ```
-
-Restart your shell (or run `compinit` in zsh) for the completions to load.
 
 ## Filtering
 
@@ -246,7 +246,10 @@ Ctrl+C  Quit and cleanup
 
 `v` toggles a panel showing the OpenVPN process's output — the connection
 handshake as well as live lines. `c` shows a `Copied: ...` confirmation that
-fades after a few seconds.
+fades after a few seconds. Keys respond immediately, even while a connection
+is being established or switched. When a config is removed after repeated
+failures, a `removed <file> from recent list` notice is shown briefly, and the
+Config line shows the `.ovpn` file name (not the full path).
 
 Pressing `n` kills the current OpenVPN process group, runs `killall -9 openvpn`
 (when enabled), marks the config as skipped (it is **not** deleted from history),

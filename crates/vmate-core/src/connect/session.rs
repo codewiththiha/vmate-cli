@@ -96,9 +96,9 @@ impl ConnectService {
             .repo
             .delete_config_by_path(Path::new(&candidate.path))
             .await;
+        let file_name = candidate.file_name();
         host.notify(&format!(
-            "dropped {} after {failures} failed attempt(s); removed from history",
-            candidate.country
+            "removed {file_name} from recent list after {failures} failed attempt(s)"
         ))
         .await?;
         Ok(())

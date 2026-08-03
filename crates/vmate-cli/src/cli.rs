@@ -78,7 +78,7 @@ pub enum Command {
     /// Check dependencies and environment.
     Doctor,
 
-    /// Generate or install shell completions.
+    /// Install shell completions (or print the script with --print).
     Completions(CompletionsArgs),
 }
 
@@ -204,13 +204,12 @@ pub struct ExportArgs {
 
 #[derive(clap::Args)]
 pub struct CompletionsArgs {
-    /// Shell to generate/install completions for.
+    /// Shell to install completions for.
     pub shell: clap_complete::Shell,
 
-    /// Write the completion script to the standard location for the shell
-    /// and print activation steps (instead of printing the script).
+    /// Print the completion script to stdout instead of installing it.
     #[arg(long)]
-    pub install: bool,
+    pub print: bool,
 }
 
 /// Parse a duration for `--timeout` and friends.

@@ -123,6 +123,8 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     });
     let options = ConnectOptions {
         connect_timeout: args.connect.connect_timeout,
+        // A session this stable is real: its crash resets the retry budget.
+        connect_stability_grace: std::time::Duration::from_secs(5),
         killall_enabled: settings.killall_enabled,
     };
 

@@ -15,13 +15,14 @@ const BREW_ZSH_COMPLETIONS_DIRS: [&str; 2] = [
     "/usr/local/share/zsh-completions",
 ];
 
-/// Shell completion subcommand: print the script to stdout, or `--install` it.
-pub fn run(shell: Shell, install: bool) -> Result<()> {
+/// Shell completion subcommand: install the completion script for the shell,
+/// or print it to stdout with `--print`.
+pub fn run(shell: Shell, print: bool) -> Result<()> {
     let mut cmd = Cli::command();
-    if install {
-        install_completions(shell, &mut cmd)?;
-    } else {
+    if print {
         clap_complete::generate(shell, &mut cmd, "vmate-cli", &mut std::io::stdout());
+    } else {
+        install_completions(shell, &mut cmd)?;
     }
     Ok(())
 }
@@ -52,7 +53,7 @@ fn install_completions_to(shell: Shell, cmd: &mut clap::Command, home: &Path) ->
         ),
         Shell::Fish => (home.join(".config/fish/completions/vmate-cli.fish"), false),
         other => bail!(
-            "automatic install is not supported for {other}; run `vmate-cli completions {other} > file` to capture the script"
+            "automatic install is not supported for {other}; run `vmate-cli completions {other} --print > file` to capture the script"
         ),
     };
 
@@ -74,7 +75,7 @@ fn install_completions_to(shell: Shell, cmd: &mut clap::Command, home: &Path) ->
         Shell::Zsh => println!("Restart your shell (or run `compinit`) to activate."),
         Shell::Bash => println!(
             "Restart your shell (or run `source ~/.bashrc`). If bash-completion is not \
-             installed, add to ~/.bashrc:  source <(vmate-cli completions bash)"
+             installed, add to ~/.bashrc:  source <(vmate-cli completions bash --print)"
         ),
         Shell::Fish => println!("Restart fish to activate."),
         _ => {}

@@ -1,6 +1,6 @@
 //! Launching and monitoring OpenVPN processes.
 
-use crate::connect::ConnectHost;
+use crate::connect::{ConnectHost, UserCommand};
 use crate::ovpn::monitor::{VpnLineClass, classify_line};
 use crate::system::killer::ProcessKiller;
 use anyhow::{Context, Result, anyhow};
@@ -151,6 +151,8 @@ pub enum ConnectOutcome {
     TimedOut,
     Exited,
     Cancelled,
+    /// The user pressed `n`/Next while the handshake was in progress.
+    Next,
 }
 
 /// Watch a test connection until success, an error keyword, a timeout or
@@ -207,6 +209,17 @@ pub async fn monitor_connect(
                     VpnLineClass::Error(kw) => return ConnectOutcome::Error(kw.to_string()),
                     VpnLineClass::RestartPause => return ConnectOutcome::RestartPause,
                     VpnLineClass::Info => {}
+                }
+            }
+            cmd = host.poll_command() => {
+                // Keep the UI responsive while the handshake runs: 'q' quits
+                // immediately, 'n' skips to the next config. 'v' is already
+                // toggled by the host itself; Help/CopyPath/Reconnect are no-ops
+                // while connecting.
+                match cmd {
+                    Some(UserCommand::Quit) => return ConnectOutcome::Cancelled,
+                    Some(UserCommand::Next) => return ConnectOutcome::Next,
+                    _ => {}
                 }
             }
         }

@@ -55,9 +55,9 @@ fn doctor_help_works() {
 }
 
 #[test]
-fn completions_generate_bash() {
+fn completions_print_bash() {
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["completions", "bash"])
+    cmd.args(["completions", "bash", "--print"])
         .assert()
         .success()
         .stdout(predicate::str::contains("complete"));
@@ -70,7 +70,7 @@ fn completions_install_bash_writes_file() {
         .path()
         .join(".local/share/bash-completion/completions/vmate-cli");
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["completions", "bash", "--install"])
+    cmd.args(["completions", "bash"])
         .env("HOME", home.path())
         .assert()
         .success()

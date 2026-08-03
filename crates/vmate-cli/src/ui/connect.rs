@@ -28,14 +28,32 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 /// before reverting to the connected status.
 const MESSAGE_TTL: Duration = Duration::from_secs(3);
 
+/// Whether a transient overlay came from the connect status (the fading
+/// "Connected successfully to X" confirmation) or from a user-facing notice
+/// (`notify`/`copy`, e.g. "removed ... from recent list"). A confirmation is
+/// stale the moment we leave the connected state; a notice keeps riding out
+/// its TTL across a candidate switch.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TransientKind {
+    Connected,
+    Notice,
+}
+
+/// A transient overlay message with the instant it was shown and its kind. It
+/// overrides `status.message` until it fades after `MESSAGE_TTL`, then the
+/// persistent status message (or nothing, once connected) is shown instead.
+/// Keeping the text here lets a notice survive the next `status()` call.
+struct Transient {
+    kind: TransientKind,
+    text: String,
+    shown_at: Instant,
+}
+
 /// The connect-mode terminal host.
 pub struct ConnectTui {
     term: Term,
     connected_since: Option<Instant>,
-    /// When the last transient message was shown (`copy`/`notify`, or the
-    /// connected confirmation). `None` means the current message is a
-    /// persistent service status (connecting/reconnecting/retrying).
-    message_since: Option<Instant>,
+    transient: Option<Transient>,
     verbose: bool,
     no_interactive: bool,
     filter: String,
@@ -59,7 +77,7 @@ impl ConnectTui {
         Ok(Self {
             term,
             connected_since: None,
-            message_since: None,
+            transient: None,
             verbose,
             no_interactive,
             filter,
@@ -85,23 +103,29 @@ impl ConnectTui {
             .as_ref()
             .map(|c| c.country.as_str())
             .unwrap_or("-");
-        let path = self
+        let file_name = self
             .status
             .candidate
             .as_ref()
-            .map(|c| c.path.as_str())
-            .unwrap_or("-");
+            .map(|c| c.file_name())
+            .unwrap_or_else(|| "-".to_string());
         let (state, color) = if self.status.connected {
             ("Connected", Color::Green)
         } else {
             ("Connecting", Color::Yellow)
         };
         let filter = self.filter.clone();
-        // Transient messages (Copied/help/connected confirmation) fade after
-        // MESSAGE_TTL; connecting/reconnecting statuses stay persistent.
-        let message = match self.message_since {
-            Some(ts) if ts.elapsed() < MESSAGE_TTL => self.status.message.clone(),
-            Some(_) => String::new(),
+        // Expire a stale overlay, then render: a fresh transient overrides the
+        // status message; once connected the confirmation fades to empty;
+        // connecting/reconnecting statuses stay persistent.
+        if let Some(t) = &self.transient {
+            if t.shown_at.elapsed() >= MESSAGE_TTL {
+                self.transient = None;
+            }
+        }
+        let message = match &self.transient {
+            Some(t) => t.text.clone(),
+            None if self.status.connected => String::new(),
             None => self.status.message.clone(),
         };
         let verbose = self.verbose;
@@ -116,7 +140,7 @@ impl ConnectTui {
                 format!("{state}: {country}"),
                 Style::default().fg(color).add_modifier(Modifier::BOLD),
             )),
-            Line::from(format!("Config : {path}")),
+            Line::from(format!("Config : {file_name}")),
             Line::from(format!("Uptime : {uptime}")),
             Line::from(format!("Filter : {filter}")),
             Line::from(""),
@@ -226,21 +250,45 @@ impl ConnectHost for ConnectTui {
         } else if !s.connected {
             self.connected_since = None;
         }
+        let was_connected = self.status.connected;
         self.status = s.clone();
-        // Once connected, the "Connected successfully to {country}" message is
-        // redundant with the "Connected: {country}" header, so it fades like
-        // other transient messages. Connecting/reconnecting statuses stay up.
-        self.message_since = if s.connected {
-            Some(Instant::now())
-        } else {
-            None
-        };
+        // Once connected, show a fading confirmation. When connecting (or
+        // switching), leave any active transient alone so a notice like
+        // "removed ... from recent list" keeps showing while the next config
+        // connects, then fades to reveal the connecting status.
+        if s.connected {
+            let country = s
+                .candidate
+                .as_ref()
+                .map(|c| c.country.as_str())
+                .unwrap_or("-");
+            self.transient = Some(Transient {
+                kind: TransientKind::Connected,
+                text: format!("Connected successfully to {country}"),
+                shown_at: Instant::now(),
+            });
+        } else if was_connected {
+            // Leaving the connected state (skip to the next config, reconnect,
+            // crash): the "Connected successfully to X" confirmation is now
+            // stale and would contradict the connecting header — drop it. Real
+            // notices survive the switch and keep riding out their TTL.
+            if matches!(
+                self.transient,
+                Some(Transient { kind: TransientKind::Connected, .. })
+            ) {
+                self.transient = None;
+            }
+        }
         self.draw()
     }
 
     async fn notify(&mut self, message: &str) -> Result<()> {
         self.status.message = message.to_string();
-        self.message_since = Some(Instant::now());
+        self.transient = Some(Transient {
+            kind: TransientKind::Notice,
+            text: message.to_string(),
+            shown_at: Instant::now(),
+        });
         self.draw()
     }
 
@@ -253,11 +301,15 @@ impl ConnectHost for ConnectTui {
     }
 
     async fn copy(&mut self, text: &str) -> Result<()> {
-        self.status.message = match crate::ui::clipboard::copy_to_clipboard(text) {
+        let message = match crate::ui::clipboard::copy_to_clipboard(text) {
             Ok(method) => format!("Copied: {text} ({method})"),
             Err(err) => format!("copy failed: {err}"),
         };
-        self.message_since = Some(Instant::now());
+        self.transient = Some(Transient {
+            kind: TransientKind::Notice,
+            text: message,
+            shown_at: Instant::now(),
+        });
         self.draw()
     }
 

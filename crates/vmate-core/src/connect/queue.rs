@@ -3,6 +3,7 @@
 use crate::db::models::StoredConfig;
 use rand::seq::SliceRandom;
 use std::collections::VecDeque;
+use std::path::Path;
 
 /// A single candidate for the connect loop.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -10,6 +11,18 @@ pub struct Candidate {
     pub id: i64,
     pub path: String,
     pub country: String,
+}
+
+impl Candidate {
+    /// The config's file name for display, falling back to the country when the
+    /// path has no file-name component.
+    pub fn file_name(&self) -> String {
+        Path::new(&self.path)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| self.country.clone())
+    }
 }
 
 impl From<&StoredConfig> for Candidate {
