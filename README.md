@@ -44,6 +44,34 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo fmt --check
 ```
 
+## Install from a release
+
+Releases are built automatically when a `v*` tag is pushed. Each release
+attaches a zip per platform (`vmate-cli-<version>-<target>.zip`):
+
+| Target | Binary | Notes |
+| ------ | ------ | ----- |
+| `aarch64-apple-darwin` | Apple Silicon Macs | arm64 |
+| `x86_64-apple-darwin` | Intel Macs | x86_64 |
+| `x86_64-unknown-linux-gnu` | Linux x86_64 | most servers / desktops |
+| `aarch64-unknown-linux-gnu` | Linux arm64 | Pi, AWS Graviton, etc. |
+
+Windows is not shipped — vmate-cli is Unix-only (process groups, root checks,
+`killall`).
+
+Download and extract a zip, then install the binary to your PATH:
+
+```bash
+tar -xzf vmate-cli-1.0.1-aarch64-apple-darwin.zip
+cd vmate-cli-1.0.1-aarch64-apple-darwin
+sudo ./install.sh        # copies vmate-cli → /usr/local/bin
+vmate-cli --help
+```
+
+`install.sh` can also replace an existing install, install to a different
+directory by editing the `DEST`/`OPERATION` variables at the top, and remove
+itself with `sudo ./install.sh --uninstall`.
+
 ## Usage
 
 ```

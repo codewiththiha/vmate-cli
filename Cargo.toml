@@ -13,8 +13,19 @@ license = "MIT"
 authors = ["codewiththiha"]
 
 [workspace.dependencies]
-# Async runtime
-tokio = { version = "1", features = ["full"] }
+# Async runtime. Deliberately NOT `full`: vmate only needs process spawning,
+# timers, signals, mpsc, DNS lookup, and the runtime itself — trimming the
+# rest (fs, async stdio, most of net) keeps the binary noticeably smaller.
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "macros",
+    "time",
+    "process",
+    "signal",
+    "sync",
+    "io-util",
+    "net",
+] }
 tokio-util = { version = "0.7", features = ["rt"] }
 futures = "0.3"
 async-trait = "0.1"
@@ -71,7 +82,10 @@ ratatui = "0.29"
 crossterm = "0.28"
 indicatif = "0.17"
 comfy-table = "7"
-arboard = "3"
+# Text clipboard only: disabling the default `image-data` feature drops the
+# heavy `image` crate (only needed for copying image data, which vmate never
+# does). Text copy still works on every platform.
+arboard = { version = "3", default-features = false }
 base64 = "0.22"
 url = "2"
 
@@ -84,10 +98,13 @@ predicates = "3"
 
 [profile.release]
 # Maximal size optimization: smallest code, full LTO, single codegen unit,
-# fully stripped (no symbol table or debuginfo).
+# fully stripped (no symbol table or debuginfo). `panic = "abort"` drops the
+# unwinder and panic-unwind path (a CLI has no use for unwinding across the
+# FFI boundary), shaving a few hundred KB.
 opt-level = "z"
 lto = true
 codegen-units = 1
+panic = "abort"
 strip = true
 
 # macOS 26+/27 dyld rejects dylibs whose LINKEDIT string pool is misaligned.
