@@ -1,38 +1,29 @@
-# vmate-cli v1.0.1
+# vmate-cli v1.1.0
 
 Prebuilt binaries for macOS (Apple Silicon and Intel) and Linux (x86_64 and
 arm64). Each zip contains the `vmate-cli` binary and `install.sh`, which copies
 the binary onto your PATH.
 
-## Connect
+## Process safety
 
-- Pressing `n` during the connection handshake now skips to the next config
-  without removing it from history.
-- A connection that stays up past a short stability window no longer counts
-  its crash against the retry budget: a config that works and then hits a
-  network blip is no longer deleted from the recent list after two crashes.
-  Connect-then-crash configs are still retried once and dropped after two
-  failed attempts.
-- The connect UI shows the `.ovpn` file name and a "removed from recent list"
-  notice instead of the full path.
-- Fixed a stale "Connected successfully to X" message lingering after
-  skipping to the next config or reconnecting.
+- The default cleanup now targets **only the OpenVPN processes vmate-cli
+  spawned** (a per-process PID registry), instead of the global
+  `killall -9 openvpn` sweep. Other VPN instances, containers, and
+  system-managed OpenVPN processes are no longer touched.
+- Processes are stopped gracefully: SIGTERM with a 3-second grace period,
+  then SIGKILL only if still alive — so OpenVPN can clean up routes, TUN/TAP
+  devices, and PID files before exiting.
+- The global sweep is still available as an opt-in `--killall` flag (default
+  off). **Breaking change:** the old `--no-killall` flag is removed; the
+  default is per-process cleanup.
 
-## Completions
+## Elevation
 
-- `completions` now installs the script by default; pass `--print` to write
-  the raw script to stdout.
-- Fixed the bash activation hint and the unsupported-shell message to
-  reference `--print`, matching the new default.
+- New `--no-elevate` flag runs with current privileges instead of
+  re-executing under sudo (mirrors the `VMATE_NO_ELEVATE` env var).
 
-## Packaging
+## Country detection and privacy
 
-- Release binary is about 15% smaller (4.1 MB to 3.5 MB on Apple Silicon)
-  via `panic = "abort"`, trimmed tokio features, and dropping the unused
-  image crate.
-- New release workflow builds macOS (`aarch64`, `x86_64`) and Linux
-  (`x86_64`, `aarch64`) binaries automatically when a version tag is pushed,
-  and attaches SHA256 checksums to the release.
-- `install.sh` is bundled with each binary: extract the zip, run
-  `sudo ./install.sh`, and `vmate-cli` is on your PATH. It can also replace
-  an existing install, or remove it later with `sudo ./install.sh --uninstall`.
+- vmate-cli now warns once when it falls back to the shared free ipinfo.io
+  token, so it is clear that client IPs are sent to ipinfo.io. Set
+  `--ipinfo-token` or `IPINFO_TOKEN` to use your own token.
