@@ -116,5 +116,5 @@ jobs:
           files: |
             artifacts/**/*.zip
             *SHA256SUMS.txt
-          generate_release_notes: true
+          body_path: RELEASE_NOTES.md
           fail_on_unmatched_files: true
