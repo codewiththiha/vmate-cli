@@ -18,7 +18,7 @@ use crate::connect::session::Phase2Exit;
 use crate::connect::state::ConnectionStatus;
 use crate::db::ConfigRepo;
 use crate::ovpn::process::{ConnectOutcome, OpenVpnRunner, connect_args, monitor_connect};
-use crate::system::killer::{CleanupGuard, ProcessKiller};
+use crate::system::killer::{CleanupGuard, ProcessKiller, ProcessRegistry};
 use anyhow::Result;
 use std::path::Path;
 use std::sync::Arc;
@@ -40,28 +40,74 @@ pub struct ConnectOptions {
     pub killall_enabled: bool,
 }
 
+/// What a failed attempt should do with the same config.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetryDecision {
+    /// Retry the config once more.
+    Retry,
+    /// Drop the config from history (budget exhausted).
+    Drop,
+}
+
+/// Pure retry/drop budget: how many failed attempts a config is allowed before
+/// it is dropped from history. Synchronous and process-free, so the retry
+/// policy is unit-testable without spawning OpenVPN.
+#[derive(Debug, Clone, Copy)]
+pub struct RetryBudget {
+    pub max: u32,
+    pub failures: u32,
+}
+
+impl RetryBudget {
+    /// A budget that drops a config after `max` failed attempts.
+    pub fn new(max: u32) -> Self {
+        Self {
+            max: max.max(1),
+            failures: 0,
+        }
+    }
+
+    /// Reset the counter after a session that proved stable.
+    pub fn reset(&mut self) {
+        self.failures = 0;
+    }
+
+    /// Register one failed attempt and decide whether to retry or drop.
+    pub fn on_failure(&mut self) -> RetryDecision {
+        self.failures += 1;
+        if self.failures >= self.max {
+            RetryDecision::Drop
+        } else {
+            RetryDecision::Retry
+        }
+    }
+}
+
 /// Orchestrates the connect loop.
 pub struct ConnectService {
     pub runner: Arc<dyn OpenVpnRunner>,
     pub killer: Arc<dyn ProcessKiller>,
+    pub registry: Arc<ProcessRegistry>,
     pub repo: Arc<ConfigRepo>,
     pub options: ConnectOptions,
 }
 
 impl ConnectService {
     pub async fn run(&self, mut queue: ConnectQueue, host: &mut dyn ConnectHost) -> Result<()> {
-        let _guard = CleanupGuard::new(self.killer.clone(), self.options.killall_enabled);
+        let _guard = CleanupGuard::new(
+            self.killer.clone(),
+            self.registry.clone(),
+            self.options.killall_enabled,
+        );
         let cancel = CancellationToken::new();
         // Go parity: try once, reconnect once, then drop from history. The
         // budget is configurable via ConnectOptions::retry_count.
-        let max_failures = self.options.retry_count;
-
         while let Some(first) = queue.next_candidate() {
             if cancel.is_cancelled() {
                 break;
             }
             let candidate = first;
-            let mut failures: u32 = 0;
+            let mut budget = RetryBudget::new(self.options.retry_count);
             let mut last_reason: Option<String> = None;
             let mut reconnecting = false;
 
@@ -73,17 +119,21 @@ impl ConnectService {
 
                 let message = if reconnecting {
                     format!("Reconnecting to {}", candidate.country)
-                } else if failures == 0 {
+                } else if budget.failures == 0 {
                     format!("Connecting to {}", candidate.country)
                 } else {
                     match &last_reason {
                         Some(reason) => format!(
-                            "Retrying {} (failure {failures}/{max_failures}): {reason}",
-                            candidate.country
+                            "Retrying {} (failure {}/{max}): {reason}",
+                            candidate.country,
+                            budget.failures,
+                            max = budget.max
                         ),
                         None => format!(
-                            "Retrying {} (failure {failures}/{max_failures})",
-                            candidate.country
+                            "Retrying {} (failure {}/{max})",
+                            candidate.country,
+                            budget.failures,
+                            max = budget.max
                         ),
                     }
                 };
@@ -109,7 +159,6 @@ impl ConnectService {
                         return Err(e);
                     }
                 };
-                let pid = handle.child.id().unwrap_or(0);
                 let outcome = monitor_connect(
                     &mut handle.lines,
                     self.options.connect_timeout,
@@ -120,14 +169,14 @@ impl ConnectService {
 
                 match outcome {
                     ConnectOutcome::Cancelled => {
-                        self.kill_handle(pid, &mut handle).await;
+                        handle.kill_graceful(self.killer.as_ref()).await;
                         host.finish().await?;
                         return Ok(());
                     }
                     ConnectOutcome::Next => {
                         // User pressed `n` during the handshake: KEEP in DB,
                         // defer in-session, move to the next candidate.
-                        self.kill_handle(pid, &mut handle).await;
+                        handle.kill_graceful(self.killer.as_ref()).await;
                         let _ = self.repo.mark_skipped(candidate.id).await;
                         queue.skip(candidate);
                         break;
@@ -139,7 +188,7 @@ impl ConnectService {
                         let exit = self
                             .monitor_connected(&candidate, &mut handle, host, &cancel)
                             .await?;
-                        self.kill_handle(pid, &mut handle).await; // targeted kill only
+                        handle.kill_graceful(self.killer.as_ref()).await; // targeted kill only
                         match exit {
                             Phase2Exit::Quit => {
                                 host.finish().await?;
@@ -164,16 +213,16 @@ impl ConnectService {
                                 // connect-then-crash flakiness and still counts —
                                 // resetting there would retry it forever.
                                 if connected_at.elapsed() >= self.options.connect_stability_grace {
-                                    failures = 0;
+                                    budget.reset();
                                 }
                                 let _ = self
                                     .repo
                                     .note_connect_failure(Path::new(&candidate.path))
                                     .await;
-                                failures += 1;
                                 last_reason = Some(reason.clone());
-                                if failures >= max_failures {
-                                    self.drop_candidate(&candidate, failures, host).await?;
+                                if budget.on_failure() == RetryDecision::Drop {
+                                    self.drop_candidate(&candidate, budget.failures, host)
+                                        .await?;
                                     break;
                                 }
                                 host.notify(&format!("{reason}; retrying {}", candidate.country))
@@ -202,15 +251,15 @@ impl ConnectService {
                                 unreachable!()
                             }
                         };
-                        self.kill_handle(pid, &mut handle).await; // targeted kill only
+                        handle.kill_graceful(self.killer.as_ref()).await; // targeted kill only
                         let _ = self
                             .repo
                             .note_connect_failure(Path::new(&candidate.path))
                             .await;
-                        failures += 1;
                         last_reason = Some(reason.clone());
-                        if failures >= max_failures {
-                            self.drop_candidate(&candidate, failures, host).await?;
+                        if budget.on_failure() == RetryDecision::Drop {
+                            self.drop_candidate(&candidate, budget.failures, host)
+                                .await?;
                             break;
                         }
                         host.notify(&format!("{reason}; retrying {}", candidate.country))
@@ -236,6 +285,32 @@ mod tests {
     use crate::db::pool::init_pool;
     use async_trait::async_trait;
     use std::sync::Mutex;
+
+    #[test]
+    fn budget_drops_after_max_failures() {
+        let mut b = RetryBudget::new(2);
+        assert_eq!(b.on_failure(), RetryDecision::Retry);
+        assert_eq!(b.on_failure(), RetryDecision::Drop);
+    }
+
+    #[test]
+    fn budget_retry_count_is_configurable() {
+        let mut b = RetryBudget::new(3);
+        assert_eq!(b.on_failure(), RetryDecision::Retry);
+        assert_eq!(b.on_failure(), RetryDecision::Retry);
+        assert_eq!(b.on_failure(), RetryDecision::Drop);
+    }
+
+    #[test]
+    fn budget_reset_lets_a_stable_session_retry_again() {
+        // A long-lived session's crash resets the budget, so two network
+        // blips never delete a working config.
+        let mut b = RetryBudget::new(2);
+        assert_eq!(b.on_failure(), RetryDecision::Retry);
+        b.reset();
+        assert_eq!(b.on_failure(), RetryDecision::Retry);
+        assert_eq!(b.on_failure(), RetryDecision::Drop);
+    }
 
     struct FakeHost {
         commands: Mutex<std::vec::IntoIter<UserCommand>>,
@@ -296,7 +371,9 @@ mod tests {
     /// Spawns `sh -c 'echo "Initialization Sequence Completed"'`: the handshake
     /// succeeds, then the process exits immediately, so the connected session
     /// crashes right after connecting (a connect-then-crash).
-    struct ConnectThenExitRunner;
+    struct ConnectThenExitRunner {
+        registry: Arc<ProcessRegistry>,
+    }
 
     impl OpenVpnRunner for ConnectThenExitRunner {
         fn spawn(&self, _args: &[String]) -> Result<crate::ovpn::process::OpenVpnHandle> {
@@ -306,6 +383,7 @@ mod tests {
                     "-c".into(),
                     "echo 'Initialization Sequence Completed'".into(),
                 ],
+                &self.registry,
             )
         }
         fn bin(&self) -> &str {
@@ -315,11 +393,17 @@ mod tests {
 
     /// Spawns a real `sh -c 'echo AUTH_FAILED'`, so the handshake monitor
     /// immediately sees an error line and the connection fails.
-    struct FailHandshakeRunner;
+    struct FailHandshakeRunner {
+        registry: Arc<ProcessRegistry>,
+    }
 
     impl OpenVpnRunner for FailHandshakeRunner {
         fn spawn(&self, _args: &[String]) -> Result<crate::ovpn::process::OpenVpnHandle> {
-            crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "echo AUTH_FAILED".into()])
+            crate::ovpn::process::spawn_openvpn(
+                "sh",
+                &["-c".into(), "echo AUTH_FAILED".into()],
+                &self.registry,
+            )
         }
         fn bin(&self) -> &str {
             "sh"
@@ -328,11 +412,17 @@ mod tests {
 
     /// Spawns `sh -c 'sleep 30'`: no completion or error lines, so the
     /// handshake hangs until a key is pressed or the timeout fires.
-    struct SlowRunner;
+    struct SlowRunner {
+        registry: Arc<ProcessRegistry>,
+    }
 
     impl OpenVpnRunner for SlowRunner {
         fn spawn(&self, _args: &[String]) -> Result<crate::ovpn::process::OpenVpnHandle> {
-            crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "sleep 30".into()])
+            crate::ovpn::process::spawn_openvpn(
+                "sh",
+                &["-c".into(), "sleep 30".into()],
+                &self.registry,
+            )
         }
         fn bin(&self) -> &str {
             "sh"
@@ -343,7 +433,9 @@ mod tests {
     /// the handshake succeeds, the session stays up past the stability grace,
     /// then the process exits — a long-lived session's crash, not a
     /// connect-then-crash.
-    struct ConnectThenStableThenExitRunner;
+    struct ConnectThenStableThenExitRunner {
+        registry: Arc<ProcessRegistry>,
+    }
 
     impl OpenVpnRunner for ConnectThenStableThenExitRunner {
         fn spawn(&self, _args: &[String]) -> Result<crate::ovpn::process::OpenVpnHandle> {
@@ -353,6 +445,7 @@ mod tests {
                     "-c".into(),
                     "echo 'Initialization Sequence Completed'; sleep 0.2".into(),
                 ],
+                &self.registry,
             )
         }
         fn bin(&self) -> &str {
@@ -367,6 +460,7 @@ mod tests {
         ConnectService {
             runner: Arc::new(NeverSpawn),
             killer,
+            registry: Arc::new(ProcessRegistry::new()),
             repo,
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
@@ -440,9 +534,13 @@ mod tests {
         let killer: Arc<dyn ProcessKiller> = Arc::new(crate::system::killer::RealProcessKiller {
             killall_enabled: false,
         });
+        let registry = Arc::new(ProcessRegistry::new());
         let service = ConnectService {
-            runner: Arc::new(FailHandshakeRunner),
+            runner: Arc::new(FailHandshakeRunner {
+                registry: registry.clone(),
+            }),
             killer,
+            registry,
             repo: repo.clone(),
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
@@ -472,6 +570,7 @@ mod tests {
     /// (`sleep 30`), so a configurable retry budget can be observed mid-flight.
     struct FailTwiceThenHang {
         spawns: std::sync::atomic::AtomicUsize,
+        registry: Arc<ProcessRegistry>,
     }
 
     impl OpenVpnRunner for FailTwiceThenHang {
@@ -479,9 +578,17 @@ mod tests {
             use std::sync::atomic::Ordering;
             let n = self.spawns.fetch_add(1, Ordering::SeqCst);
             if n < 2 {
-                crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "echo AUTH_FAILED".into()])
+                crate::ovpn::process::spawn_openvpn(
+                    "sh",
+                    &["-c".into(), "echo AUTH_FAILED".into()],
+                    &self.registry,
+                )
             } else {
-                crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "sleep 30".into()])
+                crate::ovpn::process::spawn_openvpn(
+                    "sh",
+                    &["-c".into(), "sleep 30".into()],
+                    &self.registry,
+                )
             }
         }
         fn bin(&self) -> &str {
@@ -549,7 +656,9 @@ mod tests {
             .await
             .unwrap();
 
-        let make_service = |runner: Arc<dyn OpenVpnRunner>, repo: Arc<ConfigRepo>| {
+        let make_service = |runner: Arc<dyn OpenVpnRunner>,
+                            registry: Arc<ProcessRegistry>,
+                            repo: Arc<ConfigRepo>| {
             let killer: Arc<dyn ProcessKiller> =
                 Arc::new(crate::system::killer::RealProcessKiller {
                     killall_enabled: false,
@@ -557,9 +666,14 @@ mod tests {
             ConnectService {
                 runner,
                 killer,
+                registry,
                 repo,
                 options: ConnectOptions {
-                    connect_timeout: Duration::from_secs(1),
+                    // Long handshake timeout so the host's `q` (returned
+                    // once two failures are seen) always wins the race over a
+                    // timeout — otherwise a scheduler-delayed poll can turn
+                    // the intended cancel into a 3rd failure and a drop.
+                    connect_timeout: Duration::from_secs(30),
                     connect_stability_grace: Duration::from_secs(1),
                     retry_count: 3,
                     killall_enabled: false,
@@ -574,10 +688,13 @@ mod tests {
             failures_seen: 0,
             quit_after: 2,
         };
+        let registry = Arc::new(ProcessRegistry::new());
         let service = make_service(
             Arc::new(FailTwiceThenHang {
                 spawns: std::sync::atomic::AtomicUsize::new(0),
+                registry: registry.clone(),
             }),
+            registry,
             repo.clone(),
         );
         service
@@ -600,7 +717,14 @@ mod tests {
         );
 
         // Phase 2: from a clean slate, three real failures drop the config.
-        let service = make_service(Arc::new(FailHandshakeRunner), repo.clone());
+        let registry = Arc::new(ProcessRegistry::new());
+        let service = make_service(
+            Arc::new(FailHandshakeRunner {
+                registry: registry.clone(),
+            }),
+            registry,
+            repo.clone(),
+        );
         let mut host = FakeHost::new(vec![]);
         service
             .run(
@@ -658,9 +782,13 @@ mod tests {
         let killer: Arc<dyn ProcessKiller> = Arc::new(crate::system::killer::RealProcessKiller {
             killall_enabled: false,
         });
+        let registry = Arc::new(ProcessRegistry::new());
         let service = ConnectService {
-            runner: Arc::new(ConnectThenExitRunner),
+            runner: Arc::new(ConnectThenExitRunner {
+                registry: registry.clone(),
+            }),
             killer,
+            registry,
             repo: repo.clone(),
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
@@ -762,9 +890,13 @@ mod tests {
         let killer: Arc<dyn ProcessKiller> = Arc::new(crate::system::killer::RealProcessKiller {
             killall_enabled: false,
         });
+        let registry = Arc::new(ProcessRegistry::new());
         let service = ConnectService {
-            runner: Arc::new(ConnectThenStableThenExitRunner),
+            runner: Arc::new(ConnectThenStableThenExitRunner {
+                registry: registry.clone(),
+            }),
             killer,
+            registry,
             repo: repo.clone(),
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
@@ -821,9 +953,13 @@ mod tests {
         let killer: Arc<dyn ProcessKiller> = Arc::new(crate::system::killer::RealProcessKiller {
             killall_enabled: false,
         });
+        let registry = Arc::new(ProcessRegistry::new());
         let service = ConnectService {
-            runner: Arc::new(SlowRunner),
+            runner: Arc::new(SlowRunner {
+                registry: registry.clone(),
+            }),
             killer,
+            registry,
             repo: repo.clone(),
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(30), // quit must beat this

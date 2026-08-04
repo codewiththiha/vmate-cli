@@ -108,7 +108,7 @@ impl ScanService {
                 };
 
                 counts.tested.fetch_add(1, Ordering::SeqCst);
-                progress.tested(counts.tested.load(Ordering::SeqCst));
+                progress.tested();
 
                 if !ok {
                     progress.failed(&path);
@@ -119,7 +119,7 @@ impl ScanService {
                 }
 
                 counts.ok.fetch_add(1, Ordering::SeqCst);
-                progress.ok(counts.ok.load(Ordering::SeqCst));
+                progress.ok();
 
                 // Geo lookup is independent of the test and must never block the
                 // whole scan on a slow HTTP call; failures degrade to UNKNOWN.
@@ -159,7 +159,7 @@ impl ScanService {
                             country: lookup.country,
                         });
                         counts.matched.fetch_add(1, Ordering::SeqCst);
-                        progress.matched(counts.matched.load(Ordering::SeqCst));
+                        progress.matched();
                         if results.len() >= limit {
                             cancel.cancel();
                         }

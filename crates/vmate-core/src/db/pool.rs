@@ -1,6 +1,7 @@
 //! SQLite connection pool with WAL mode and automatic migrations.
 
 use anyhow::{Context, Result};
+use sqlx::Row;
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::path::Path;
@@ -44,4 +45,13 @@ pub async fn init_pool(db_path: &Path) -> Result<DbPool> {
         .context("failed to run database migrations")?;
 
     Ok(pool)
+}
+
+/// The current SQLite journal mode (used by `vmate-cli doctor`).
+pub async fn journal_mode(pool: &DbPool) -> Result<String> {
+    let row = sqlx::query("PRAGMA journal_mode")
+        .fetch_one(pool)
+        .await
+        .context("journal_mode check failed")?;
+    Ok(row.get::<String, _>("journal_mode"))
 }

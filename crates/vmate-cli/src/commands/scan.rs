@@ -28,6 +28,19 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
 
     require_root_for("run OpenVPN tests", settings.no_elevate)?;
 
+    scan_pipeline(settings, args, verbose).await?;
+    Ok(())
+}
+
+/// The full scan orchestration: DB/repo/killer/tester/geo wiring, option
+/// resolution, the scan itself, the report and the export. Returns the report
+/// and repo so `all` can go on to connect. Shared by `scan` and `all` so the
+/// preamble (and its report format) lives in one place.
+pub(crate) async fn scan_pipeline(
+    settings: &Settings,
+    args: &ScanArgs,
+    verbose: &Verbosity,
+) -> Result<(ScanReport, Arc<ConfigRepo>)> {
     let us = UserSettings::load();
     let (workers, limit, timeout) = resolve_scan_defaults(args, &us);
 
@@ -35,12 +48,14 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
 
     let pool = init_pool(&settings.db_path).await?;
     let repo = Arc::new(ConfigRepo::new(pool));
+    let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
     let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
         killall_enabled: settings.killall_enabled,
     });
     let tester: Arc<dyn VpnTester> = Arc::new(RealVpnTester {
         bin: settings.openvpn_bin.clone(),
         killer: killer.clone(),
+        registry: registry.clone(),
     });
     let geo = Arc::new(IpInfoGeoLocator::new(
         repo.clone(),
@@ -72,7 +87,7 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         let _ = shutdown_signal().await;
         cancel_task.cancel();
     });
-    let _guard = CleanupGuard::new(killer.clone(), settings.killall_enabled);
+    let _guard = CleanupGuard::new(killer.clone(), registry.clone(), settings.killall_enabled);
 
     let progress: Arc<dyn ScanProgress> = if crate::app::is_verbose(verbose) {
         Arc::new(VerboseReporter)
@@ -99,7 +114,7 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         );
     }
 
-    Ok(())
+    Ok((report, repo))
 }
 
 /// Resolve the scan `workers`/`limit`/`timeout` as
@@ -115,24 +130,15 @@ pub(crate) fn resolve_scan_defaults(
     )
 }
 
-/// Apply the explicitly-passed scan default flags onto `us`.
-fn apply_scan_defaults(us: &mut UserSettings, args: &ScanArgs) {
-    if let Some(v) = args.max {
-        us.max_workers = Some(v as u64);
-    }
-    if let Some(v) = args.limit {
-        us.limit = Some(v as u64);
-    }
-    if let Some(t) = args.timeout {
-        us.scan_timeout_secs = Some(t.as_secs());
-    }
-}
-
 /// Persist the explicitly-passed scan default flags to the user config and
 /// print a confirmation. Only the flags actually passed are written.
 pub(crate) fn persist_scan_defaults(args: &ScanArgs) -> Result<()> {
     let mut us = UserSettings::load();
-    apply_scan_defaults(&mut us, args);
+    us.persist_scan(&vmate_core::settings::ScanDefaults {
+        max_workers: args.max.map(|v| v as u64),
+        limit: args.limit.map(|v| v as u64),
+        timeout: args.timeout,
+    });
     us.save()?;
     println!("Saved scan defaults to {}", UserSettings::path()?.display());
     Ok(())
@@ -301,15 +307,17 @@ mod tests {
     }
 
     #[test]
-    fn apply_scan_defaults_only_writes_explicitly_passed_keys() {
+    fn persist_scan_only_writes_explicitly_passed_keys() {
+        use vmate_core::settings::ScanDefaults;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("settings.json");
 
         let mut us = UserSettings::default();
-        apply_scan_defaults(
-            &mut us,
-            &scan_args(Some(500), None, Some(Duration::from_secs(20))),
-        );
+        us.persist_scan(&ScanDefaults {
+            max_workers: Some(500),
+            limit: None,
+            timeout: Some(Duration::from_secs(20)),
+        });
         us.save_to(&path).unwrap();
 
         let loaded = UserSettings::load_from(&path);
@@ -320,7 +328,11 @@ mod tests {
         // A later save with a different explicit key must not resurrect keys
         // that were never passed.
         let mut us2 = loaded;
-        apply_scan_defaults(&mut us2, &scan_args(None, Some(25), None));
+        us2.persist_scan(&ScanDefaults {
+            max_workers: None,
+            limit: Some(25),
+            timeout: None,
+        });
         us2.save_to(&path).unwrap();
         let loaded2 = UserSettings::load_from(&path);
         assert_eq!(loaded2.max_workers, Some(500));

@@ -90,6 +90,36 @@ pub struct BuiltinConfig {
     pub proto: Proto,
 }
 
+impl BuiltinConfig {
+    /// Reconstruct the identity from a materialized path
+    /// (`<builtin_dir>/<provider>/<proto>/<host>-<port>.ovpn`). The path layout
+    /// is owned here — this is the single place that parses it back out.
+    pub fn from_path(path: &Path) -> Option<Self> {
+        if !is_builtin_path(path) {
+            return None;
+        }
+        let stem = path.file_stem()?.to_str()?;
+        let (host, port) = stem.rsplit_once('-')?;
+        if host.is_empty() || port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {
+            return None;
+        }
+        let proto_dir = path.parent()?;
+        let proto = Proto::from_name(proto_dir.file_name()?.to_str()?)?;
+        let provider_dir = proto_dir.parent()?;
+        let provider = Provider::from_name(provider_dir.file_name()?.to_str()?)?;
+        Some(BuiltinConfig {
+            provider,
+            remote: format!("remote {host} {port}"),
+            proto,
+        })
+    }
+
+    /// The `host` and `port` of this config's remote.
+    pub fn host_port(&self) -> Option<(&str, &str)> {
+        remote_host_port(&self.remote)
+    }
+}
+
 /// Header template with `{proto}` and `{remote}` placeholders, substituted by
 /// [`build_config`].
 const HEADER_TEMPLATE: &str = "\
@@ -254,27 +284,26 @@ pub fn is_builtin_path(path: &Path) -> bool {
     }
 }
 
+/// The user-facing name for a built-in config path: `<host>-<port>` (its file
+/// stem). `None` when the path is not a built-in. The display convention lives
+/// here so recent/connect don't re-derive the layout.
+pub fn display_name(path: &Path) -> Option<String> {
+    if !is_builtin_path(path) {
+        return None;
+    }
+    path.file_stem().map(|s| s.to_string_lossy().into_owned())
+}
+
 /// For a built-in path, the export file name
 /// `{provider}_{host}-{port}_{COUNTRY}.ovpn`, e.g.
 /// `vpn-gate_public-vpn-38.opengw.net-1195_JP.ovpn`. Returns `None` if the path
 /// is not a built-in or the remote can't be parsed.
 pub fn export_name(path: &Path, country: &str) -> Option<String> {
-    if !is_builtin_path(path) {
-        return None;
-    }
-    // Layout: <builtin_dir>/<provider>/<proto>/<host>-<port>.ovpn
-    let provider_name = path.parent()?.parent()?.file_name()?.to_str()?;
-    let provider = Provider::from_name(provider_name)?;
-    let stem = path.file_stem()?.to_str()?;
-    let dash = stem.rfind('-')?;
-    let host = &stem[..dash];
-    let port = &stem[dash + 1..];
-    if host.is_empty() || port.is_empty() || !port.chars().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
+    let cfg = BuiltinConfig::from_path(path)?;
+    let (host, port) = cfg.host_port()?;
     Some(format!(
         "{}_{}-{}_{}.ovpn",
-        provider.name(),
+        cfg.provider.name(),
         host,
         port,
         country
@@ -714,5 +743,29 @@ mod tests {
         assert_eq!(export_name(Path::new("/tmp/foo.ovpn"), "JP"), None);
         // Unparseable remote (no numeric port) yields None.
         assert_eq!(export_name(&dir.join("just-a-host.ovpn"), "JP"), None);
+    }
+
+    #[test]
+    fn from_path_reconstructs_identity() {
+        let dir = paths::builtin_dir().unwrap().join("vpn-gate").join("tcp");
+        let path = dir.join("public-vpn-38.opengw.net-1195.ovpn");
+        let cfg = BuiltinConfig::from_path(&path).unwrap();
+        assert_eq!(cfg.provider, Provider::VpnGate);
+        assert_eq!(cfg.proto, Proto::Tcp);
+        assert_eq!(cfg.host_port(), Some(("public-vpn-38.opengw.net", "1195")));
+        assert_eq!(cfg.remote, "remote public-vpn-38.opengw.net 1195");
+        // Not under the builtins dir -> None.
+        assert!(BuiltinConfig::from_path(Path::new("/tmp/x-1.ovpn")).is_none());
+    }
+
+    #[test]
+    fn display_name_is_host_port_stem() {
+        let dir = paths::builtin_dir().unwrap().join("vpn-gate").join("udp");
+        let path = dir.join("public-vpn-38.opengw.net-1195.ovpn");
+        assert_eq!(
+            display_name(&path).unwrap(),
+            "public-vpn-38.opengw.net-1195"
+        );
+        assert_eq!(display_name(Path::new("/tmp/foo.ovpn")), None);
     }
 }

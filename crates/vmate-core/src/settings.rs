@@ -126,6 +126,56 @@ impl UserSettings {
             .or(self.stability_grace_secs.map(Duration::from_secs))
             .unwrap_or(Duration::from_secs(5))
     }
+
+    /// Persist the explicitly-passed scan defaults onto this struct. Only the
+    /// flags that were actually given are written; the rest keep their value.
+    pub fn persist_scan(&mut self, values: &ScanDefaults) {
+        if let Some(v) = values.max_workers {
+            self.max_workers = Some(v);
+        }
+        if let Some(v) = values.limit {
+            self.limit = Some(v);
+        }
+        if let Some(t) = values.timeout {
+            self.scan_timeout_secs = Some(t.as_secs());
+        }
+    }
+
+    /// Persist the explicitly-passed connect defaults onto this struct. Only
+    /// the flags that were actually given are written; the rest keep theirs.
+    pub fn persist_connect(&mut self, values: &ConnectDefaults) {
+        if let Some(v) = values.connect_timeout {
+            self.connect_timeout_secs = Some(v.as_secs());
+        }
+        if let Some(v) = values.cooldown {
+            self.cooldown_secs = Some(v.as_secs());
+        }
+        if let Some(v) = values.retry_count {
+            self.retry_count = Some(v);
+        }
+        if let Some(v) = values.stability_grace {
+            self.stability_grace_secs = Some(v.as_secs());
+        }
+    }
+}
+
+/// Explicitly-passed scan default values (from the CLI flags that were actually
+/// given) — the input to [`UserSettings::persist_scan`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ScanDefaults {
+    pub max_workers: Option<u64>,
+    pub limit: Option<u64>,
+    pub timeout: Option<Duration>,
+}
+
+/// Explicitly-passed connect default values (from the CLI flags that were
+/// actually given) — the input to [`UserSettings::persist_connect`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct ConnectDefaults {
+    pub connect_timeout: Option<Duration>,
+    pub cooldown: Option<Duration>,
+    pub retry_count: Option<u32>,
+    pub stability_grace: Option<Duration>,
 }
 
 #[cfg(test)]
@@ -217,5 +267,31 @@ mod tests {
         assert_eq!(us.cooldown(Some(s(5))), s(5));
         assert_eq!(us.retry_count(Some(5)), 5);
         assert_eq!(us.stability_grace(Some(s(1))), s(1));
+    }
+
+    #[test]
+    fn persist_scan_writes_only_passed_fields() {
+        let mut us = UserSettings::default();
+        us.persist_scan(&ScanDefaults {
+            max_workers: Some(500),
+            timeout: Some(Duration::from_secs(20)),
+            ..Default::default()
+        });
+        assert_eq!(us.max_workers, Some(500));
+        assert_eq!(us.limit, None); // not passed -> untouched
+        assert_eq!(us.scan_timeout_secs, Some(20));
+    }
+
+    #[test]
+    fn persist_connect_writes_only_passed_fields() {
+        let mut us = UserSettings::default();
+        us.persist_connect(&ConnectDefaults {
+            retry_count: Some(4),
+            cooldown: Some(Duration::from_secs(45)),
+            ..Default::default()
+        });
+        assert_eq!(us.retry_count, Some(4));
+        assert_eq!(us.cooldown_secs, Some(45));
+        assert_eq!(us.connect_timeout_secs, None);
     }
 }
