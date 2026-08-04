@@ -56,6 +56,11 @@ pub struct Cli {
     #[arg(long, global = true, env = "IPINFO_TOKEN")]
     pub ipinfo_token: Option<String>,
 
+    /// Save explicitly-passed default flags (e.g. --max, --timeout, --retry-count)
+    /// to the persistent config for future sessions.
+    #[arg(long, global = true)]
+    pub save_defaults: bool,
+
     #[command(subcommand)]
     pub command: Command,
 }

@@ -94,8 +94,31 @@ These apply to every subcommand:
 | `--killall` | Also run `killall -9 openvpn` on shutdown/switch. Default is per-process cleanup of only the openvpn processes vmate spawned. |
 | `--no-elevate` | Don't re-execute under sudo; run with current privileges (OpenVPN will likely fail). |
 | `--ipinfo-token <TOKEN>` | ipinfo.io API token (defaults to a bundled free token). |
+| `--save-defaults` | Persist explicitly-passed default flags (e.g. `--max`, `--timeout`, `--retry-count`) to the config file for future sessions. |
 | `-v, -vv, -q` | Verbosity / quiet logging. |
 | `-h, --help` | Print help. |
+
+### Persisted defaults
+
+The scan/connect tunables (`--max`, `--limit`, `--timeout`, `--connect-timeout`,
+`--cooldown`, `--retry-count`, stability grace) have built-in defaults. Pass
+`--save-defaults` alongside the value flags to persist them for future sessions:
+
+```bash
+vmate-cli scan --save-defaults --max 500 --timeout 20
+```
+
+Only the flags you **explicitly pass** are saved; unmentioned tunables keep
+their existing persisted or built-in default. Persisted settings live in
+`~/.config/vmate-cli/settings.json` and can be edited by hand. Each tunable is
+resolved as:
+
+```
+explicit CLI flag → persisted setting → built-in default
+```
+
+A missing or corrupt `settings.json` is ignored and falls back to the built-in
+defaults.
 
 ### Commands
 
