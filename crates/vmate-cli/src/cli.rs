@@ -86,9 +86,17 @@ pub enum Command {
 
 #[derive(clap::Args)]
 pub struct ScanArgs {
-    /// Directory containing .ovpn files.
-    #[arg(default_value = "~/")]
-    pub dir: PathBuf,
+    /// Directory containing .ovpn files. When omitted, scans the built-in
+    /// remotes for the configured provider (see --provider and --proto).
+    pub dir: Option<PathBuf>,
+
+    /// Built-in provider to scan when no directory is given.
+    #[arg(long, default_value = "vpn-gate")]
+    pub provider: String,
+
+    /// Transport protocol used to build the built-in configs.
+    #[arg(long, default_value = "udp", value_parser = ["udp", "tcp"])]
+    pub proto: String,
 
     /// Maximum number of matched successful configs to collect.
     ///

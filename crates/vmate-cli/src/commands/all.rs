@@ -20,6 +20,11 @@ use vmate_core::system::{
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
     require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
+    let dir = match &args.scan.dir {
+        Some(dir) => dir.clone(),
+        None => crate::commands::scan::materialize_builtins(&args.scan.provider, &args.scan.proto)?,
+    };
+
     let pool = init_pool(&settings.db_path).await?;
     let repo = Arc::new(ConfigRepo::new(pool));
     let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
@@ -41,7 +46,7 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     };
 
     let scan_options = ScanOptions {
-        dir: args.scan.dir.clone(),
+        dir,
         limit: args.scan.limit,
         timeout: args.scan.timeout,
         workers: args.scan.max,

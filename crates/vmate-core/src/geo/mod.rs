@@ -45,12 +45,16 @@ pub struct IpInfoGeoLocator {
 #[async_trait]
 impl GeoLocator for IpInfoGeoLocator {
     async fn country_for_config(&self, config: &Path) -> Result<CountryLookup> {
-        // Fast path: a country code embedded in the file name.
-        if let Some(code) = country_from_filename(config) {
-            return Ok(CountryLookup {
-                country: code,
-                source: CountrySource::FileName,
-            });
+        // Fast path: a country code embedded in the file name. Skipped for
+        // built-ins, whose generated file names must never be mis-parsed as a
+        // country code — their country is always resolved from the remote host.
+        if !crate::builtin::is_builtin_path(config) {
+            if let Some(code) = country_from_filename(config) {
+                return Ok(CountryLookup {
+                    country: code,
+                    source: CountrySource::FileName,
+                });
+            }
         }
 
         let host = match parse_remote_host(config) {
@@ -188,5 +192,47 @@ mod tests {
     fn filename_heuristic_returns_none_when_absent() {
         let p = Path::new("/configs/vpn-gate.ovpn");
         assert!(country_from_filename(p).is_none());
+    }
+
+    #[test]
+    fn builtin_path_recognized_by_location_not_existence() {
+        // A built-in path is identified by its location, so the geo fast-path
+        // can rely on `is_builtin_path` even before anything is materialized.
+        let builtin = crate::paths::builtin_dir()
+            .unwrap()
+            .join("vpn-gate/udp/public-vpn-38.opengw.net-1195.ovpn");
+        assert!(crate::builtin::is_builtin_path(&builtin));
+        assert!(!crate::builtin::is_builtin_path(Path::new("/tmp/foo.ovpn")));
+    }
+
+    #[tokio::test]
+    async fn builtin_path_skips_filename_heuristic() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = Arc::new(ConfigRepo::new(
+            crate::db::pool::init_pool(&dir.path().join("t.db"))
+                .await
+                .unwrap(),
+        ));
+        let geo = IpInfoGeoLocator {
+            client: reqwest::Client::new(),
+            repo,
+            token: None,
+            memo: cache::GeoMemo::new(),
+        };
+
+        // A built-in path whose generated name happens to contain a two-letter
+        // token must never be short-circuited to that "country code". The file
+        // does not exist, so the remote-host path degrades to Unknown rather
+        // than FileName.
+        let builtin = crate::paths::builtin_dir()
+            .unwrap()
+            .join("vpn-gate/udp/vpn-jp-42.opengw.net-1195.ovpn");
+        let lookup = geo.country_for_config(&builtin).await.unwrap();
+        assert_ne!(lookup.source, CountrySource::FileName);
+
+        // A normal (non-built-in) path still uses the file-name shortcut.
+        let normal = Path::new("/configs/vpngate_20260801_jp_vpn-gate.ovpn");
+        let lookup = geo.country_for_config(normal).await.unwrap();
+        assert_eq!(lookup.source, CountrySource::FileName);
     }
 }
