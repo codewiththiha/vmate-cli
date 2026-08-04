@@ -76,19 +76,6 @@ impl ConnectService {
         }
     }
 
-    /// Targeted kill of one OpenVPN process tree: SIGTERM the group, wait up
-    /// to `KILL_GRACE`, then SIGKILL if needed. Deliberately NO global
-    /// `killall` here — the `CleanupGuard` (per-process registry + optional
-    /// killall) is the global safety net.
-    pub(crate) async fn kill_handle(&self, pid: u32, handle: &mut OpenVpnHandle) {
-        crate::system::killer::kill_process_tree_graceful(
-            self.killer.as_ref(),
-            pid,
-            &mut handle.child,
-        )
-        .await;
-    }
-
     /// Go parity: after `MAX_FAILURES`, remove the config from history entirely.
     pub(crate) async fn drop_candidate(
         &self,

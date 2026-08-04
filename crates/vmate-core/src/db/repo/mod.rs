@@ -241,7 +241,10 @@ mod tests {
 
     #[tokio::test]
     async fn journal_mode_is_wal() {
-        let (repo, _dir) = test_repo().await;
-        assert_eq!(repo.journal_mode().await.unwrap(), "wal");
+        let dir = tempfile::tempdir().expect("tempdir");
+        let pool = init_pool(&dir.path().join("test.db"))
+            .await
+            .expect("init pool");
+        assert_eq!(crate::db::pool::journal_mode(&pool).await.unwrap(), "wal");
     }
 }

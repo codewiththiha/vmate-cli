@@ -44,9 +44,12 @@ pub struct ScanOptions {
 /// and must be internally synchronized.
 pub trait ScanProgress: Send + Sync {
     fn total(&self, total: usize);
-    fn tested(&self, n: usize);
-    fn ok(&self, n: usize);
-    fn matched(&self, n: usize);
+    /// One config finished testing.
+    fn tested(&self);
+    /// One config succeeded.
+    fn ok(&self);
+    /// One config matched the filter.
+    fn matched(&self);
     fn success(&self, path: &Path, country: &CountryCode);
     fn failed(&self, path: &Path);
     /// Called when the scan finishes (lets a progress bar clear itself).

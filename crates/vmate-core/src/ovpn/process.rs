@@ -2,7 +2,7 @@
 
 use crate::connect::{ConnectHost, UserCommand};
 use crate::ovpn::monitor::{VpnLineClass, classify_line};
-use crate::system::killer::ProcessKiller;
+use crate::system::killer::{ProcessKiller, ProcessRegistry};
 use anyhow::{Context, Result, anyhow};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
@@ -57,11 +57,29 @@ pub struct OpenVpnHandle {
     pub lines: mpsc::Receiver<String>,
 }
 
-/// Spawn OpenVPN in a new process group.
+impl OpenVpnHandle {
+    /// Stop the process tree gracefully: SIGTERM the group, wait up to
+    /// `KILL_GRACE`, then SIGKILL stragglers. The handle owns its teardown, so
+    /// callers never reach for the raw pid or a kill policy.
+    pub async fn kill_graceful(&mut self, killer: &dyn ProcessKiller) {
+        crate::system::killer::kill_process_tree_graceful(
+            killer,
+            self.child.id().unwrap_or(0),
+            &mut self.child,
+        )
+        .await;
+    }
+}
+
+/// Spawn OpenVPN in a new process group, registering the pid in `registry`.
 ///
 /// Each spawned process gets its own process group so it can be killed with
 /// the whole tree via a single negative-pid SIGKILL.
-pub fn spawn_openvpn(bin: &str, args: &[String]) -> Result<OpenVpnHandle> {
+pub fn spawn_openvpn(
+    bin: &str,
+    args: &[String],
+    registry: &ProcessRegistry,
+) -> Result<OpenVpnHandle> {
     let mut cmd = tokio::process::Command::new(bin);
     cmd.args(args);
     cmd.stdout(Stdio::piped());
@@ -77,9 +95,9 @@ pub fn spawn_openvpn(bin: &str, args: &[String]) -> Result<OpenVpnHandle> {
         .spawn()
         .with_context(|| format!("failed to spawn OpenVPN binary: {bin}"))?;
 
-    // Track the pid so the cleanup guard can kill exactly the processes vmate
-    // spawned (a pid of 0 — unknown — is ignored by the registry).
-    crate::system::killer::register_process(child.id().unwrap_or(0));
+    // Track the pid so the cleanup guard can kill exactly the processes this
+    // session spawned (a pid of 0 — unknown — is ignored by the registry).
+    registry.register(child.id().unwrap_or(0));
 
     let stdout = child
         .stdout
@@ -123,11 +141,12 @@ pub trait OpenVpnRunner: Send + Sync {
 /// Production runner that executes the configured `openvpn` binary.
 pub struct RealOpenVpnRunner {
     pub bin: String,
+    pub registry: Arc<ProcessRegistry>,
 }
 
 impl OpenVpnRunner for RealOpenVpnRunner {
     fn spawn(&self, args: &[String]) -> Result<OpenVpnHandle> {
-        spawn_openvpn(&self.bin, args)
+        spawn_openvpn(&self.bin, args, &self.registry)
     }
 
     fn bin(&self) -> &str {
@@ -237,16 +256,15 @@ pub async fn test_openvpn_config(
     timeout: Duration,
     cancel: CancellationToken,
     killer: &dyn ProcessKiller,
+    registry: &ProcessRegistry,
 ) -> Result<bool> {
     let args = test_args(config);
-    let mut handle = spawn_openvpn(bin, &args)?;
-    let pid = handle.child.id().unwrap_or(0);
+    let mut handle = spawn_openvpn(bin, &args, registry)?;
 
     let outcome = monitor_test(&mut handle.lines, timeout, cancel).await;
 
-    // Always clean up the process group; never leak workers. Graceful: SIGTERM
-    // the group, then SIGKILL only if it is still alive after KILL_GRACE.
-    crate::system::killer::kill_process_tree_graceful(killer, pid, &mut handle.child).await;
+    // Always clean up the process tree; never leak workers.
+    handle.kill_graceful(killer).await;
 
     Ok(matches!(outcome, MonitorOutcome::Success))
 }
@@ -266,6 +284,7 @@ pub trait VpnTester: Send + Sync {
 pub struct RealVpnTester {
     pub bin: String,
     pub killer: Arc<dyn ProcessKiller>,
+    pub registry: Arc<ProcessRegistry>,
 }
 
 #[async_trait]
@@ -276,7 +295,15 @@ impl VpnTester for RealVpnTester {
         timeout: Duration,
         cancel: CancellationToken,
     ) -> Result<bool> {
-        test_openvpn_config(&self.bin, config, timeout, cancel, self.killer.as_ref()).await
+        test_openvpn_config(
+            &self.bin,
+            config,
+            timeout,
+            cancel,
+            self.killer.as_ref(),
+            &self.registry,
+        )
+        .await
     }
 }
 
@@ -299,8 +326,8 @@ mod tests {
     /// wait out the SIGKILL escalation.
     #[tokio::test]
     async fn kill_process_tree_graceful_sigterms_and_exits_quickly() {
-        crate::system::killer::clear_registry();
-        let mut handle = spawn_openvpn("sh", &["-c".into(), "sleep 5".into()]).unwrap();
+        let registry = crate::system::killer::ProcessRegistry::new();
+        let mut handle = spawn_openvpn("sh", &["-c".into(), "sleep 5".into()], &registry).unwrap();
         let pid = handle.child.id().unwrap_or(0);
         assert!(pid != 0);
 

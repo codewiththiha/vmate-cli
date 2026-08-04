@@ -3,115 +3,32 @@
 use crate::cli::AllArgs;
 use crate::commands::connect::{persist_connect_defaults, resolve_connect};
 use crate::settings::Settings;
-use crate::ui::progress::{ProgressReporter, VerboseReporter};
 use anyhow::Result;
 use clap_verbosity_flag::Verbosity;
 use std::sync::Arc;
-use tokio_util::sync::CancellationToken;
 use vmate_core::connect::{Candidate, ConnectOptions, ConnectQueue, ConnectService};
-use vmate_core::db::ConfigRepo;
-use vmate_core::db::pool::init_pool;
-use vmate_core::geo::IpInfoGeoLocator;
-use vmate_core::ovpn::process::{RealOpenVpnRunner, RealVpnTester, VpnTester};
-use vmate_core::scan::{ScanOptions, ScanProgress, ScanService};
+use vmate_core::ovpn::process::RealOpenVpnRunner;
 use vmate_core::settings::UserSettings;
-use vmate_core::system::{
-    CleanupGuard, ProcessKiller, RealProcessKiller, require_root_for, shutdown_signal,
-};
+use vmate_core::system::{ProcessKiller, RealProcessKiller, require_root_for};
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
     // --save-defaults is a pure settings operation: persist and exit without
     // scanning or connecting (no root, no OpenVPN, no DB needed).
     if settings.save_defaults {
         crate::commands::scan::persist_scan_defaults(&args.scan)?;
-        let mut us = UserSettings::load();
-        persist_connect_defaults(&mut us, &args.connect)?;
+        persist_connect_defaults(&args.connect)?;
         return Ok(());
     }
 
     require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
-    let (workers, limit, timeout) = crate::commands::scan::resolve_scan_defaults(&args.scan, &us);
     let connect = resolve_connect(&us, &args.connect);
 
-    let dir = match &args.scan.dir {
-        Some(dir) => dir.clone(),
-        None => crate::commands::scan::materialize_builtins(&args.scan.provider, &args.scan.proto)?,
-    };
-
-    let pool = init_pool(&settings.db_path).await?;
-    let repo = Arc::new(ConfigRepo::new(pool));
-    let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
-        killall_enabled: settings.killall_enabled,
-    });
-    let tester: Arc<dyn VpnTester> = Arc::new(RealVpnTester {
-        bin: settings.openvpn_bin.clone(),
-        killer: killer.clone(),
-    });
-    let geo = Arc::new(IpInfoGeoLocator::new(
-        repo.clone(),
-        settings.ipinfo_token.clone(),
-    ));
-
-    let scan_service = ScanService {
-        tester,
-        geo,
-        repo: repo.clone(),
-    };
-
-    let scan_options = ScanOptions {
-        dir,
-        limit,
-        timeout,
-        workers,
-        modify: args.scan.modify,
-        backup: args.scan.backup,
-        no_save: args.scan.no_save,
-        filter: settings.filter.clone(),
-    };
-
-    let cancel = CancellationToken::new();
-    let cancel_task = cancel.clone();
-    let signal_task = tokio::spawn(async move {
-        let _ = shutdown_signal().await;
-        cancel_task.cancel();
-    });
-    let _guard = CleanupGuard::new(killer.clone(), settings.killall_enabled);
-
-    let progress: Arc<dyn ScanProgress> = if crate::app::is_verbose(verbose) {
-        Arc::new(VerboseReporter)
-    } else {
-        Arc::new(ProgressReporter::new(settings.filter.to_display()))
-    };
-
-    let report = scan_service.scan(&scan_options, progress, cancel).await?;
-    signal_task.abort();
-
-    println!();
-    println!("--- Scan Result ---");
-    println!("Scanned:  {}", report.scanned);
-    println!("Tested:   {}", report.tested);
-    println!("Success:  {}", report.success);
-    println!("Matched:  {}", report.matched);
-    println!("Filter:   {}", report.filter);
-    for m in &report.matched_configs {
-        println!("{} -- {}", m.country, m.path.display());
-    }
-
-    // Export this scan's fresh matches (the scan already stored successes,
-    // so `vmate-cli recent` is updated as normal).
-    if let Some(export_dir) = &args.scan.export {
-        let dest = vmate_core::paths::expand_path(export_dir);
-        let result =
-            vmate_core::export::export_configs_from_matches(&report.matched_configs, &dest).await?;
-        println!(
-            "Exported {} of {} configs to {}",
-            result.exported,
-            result.total,
-            result.dest.display()
-        );
-    }
+    // The scan preamble (wiring, options, report, export) is shared with
+    // `scan`; `all` keeps only the connect half.
+    let (report, repo) =
+        crate::commands::scan::scan_pipeline(settings, &args.scan, verbose).await?;
 
     if args.no_connect {
         return Ok(());
@@ -138,8 +55,13 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     }
     let queue = ConnectQueue::new(candidates);
 
+    let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
+        registry: registry.clone(),
+    });
+    let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
+        killall_enabled: settings.killall_enabled,
     });
     let options = ConnectOptions {
         connect_timeout: connect.connect_timeout,
@@ -157,6 +79,7 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     let service = ConnectService {
         runner,
         killer,
+        registry,
         repo,
         options,
     };

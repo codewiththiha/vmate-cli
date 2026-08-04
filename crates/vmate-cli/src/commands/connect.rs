@@ -36,19 +36,14 @@ pub(crate) fn resolve_connect(us: &UserSettings, args: &ConnectArgs) -> Resolved
 
 /// Persist the explicitly-passed connect defaults, then confirm where they
 /// were written.
-pub(crate) fn persist_connect_defaults(us: &mut UserSettings, args: &ConnectArgs) -> Result<()> {
-    if let Some(v) = args.connect_timeout {
-        us.connect_timeout_secs = Some(v.as_secs());
-    }
-    if let Some(v) = args.cooldown {
-        us.cooldown_secs = Some(v.as_secs());
-    }
-    if let Some(v) = args.retry_count {
-        us.retry_count = Some(v);
-    }
-    if let Some(v) = args.stability_grace {
-        us.stability_grace_secs = Some(v.as_secs());
-    }
+pub(crate) fn persist_connect_defaults(args: &ConnectArgs) -> Result<()> {
+    let mut us = UserSettings::load();
+    us.persist_connect(&vmate_core::settings::ConnectDefaults {
+        connect_timeout: args.connect_timeout,
+        cooldown: args.cooldown,
+        retry_count: args.retry_count,
+        stability_grace: args.stability_grace,
+    });
     us.save()?;
     println!(
         "Saved connect defaults to {}",
@@ -61,8 +56,7 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
     // --save-defaults is a pure settings operation: persist and exit without
     // connecting (no root, no OpenVPN, no DB needed).
     if settings.save_defaults {
-        let mut us = UserSettings::load();
-        persist_connect_defaults(&mut us, args)?;
+        persist_connect_defaults(args)?;
         return Ok(());
     }
 
@@ -95,8 +89,10 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
     let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
         killall_enabled: settings.killall_enabled,
     });
+    let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
+        registry: registry.clone(),
     });
 
     let options = ConnectOptions {
@@ -115,6 +111,7 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
     let service = ConnectService {
         runner,
         killer,
+        registry,
         repo,
         options,
     };

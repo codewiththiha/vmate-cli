@@ -24,15 +24,7 @@ use vmate_core::db::models::StoredConfig;
 /// Path shown for an entry: for a built-in config, its remote display
 /// (`<host>-<port>`, from the file stem); otherwise the filesystem path.
 fn display_path(path: &str) -> String {
-    if vmate_core::builtin::is_builtin_path(Path::new(path)) {
-        Path::new(path)
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or(path)
-            .to_string()
-    } else {
-        path.to_string()
-    }
+    vmate_core::builtin::display_name(Path::new(path)).unwrap_or_else(|| path.to_string())
 }
 
 type Term = Terminal<CrosstermBackend<Stdout>>;

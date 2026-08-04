@@ -1,4 +1,4 @@
-//! IP -> country cache and journal-mode diagnostics.
+//! IP -> country cache.
 
 use crate::country::CountryCode;
 use crate::db::repo::ConfigRepo;
@@ -41,14 +41,5 @@ impl ConfigRepo {
         .await
         .context("cache_country_for_ip failed")?;
         Ok(())
-    }
-
-    /// Current journal mode (used by `vmate-cli doctor`).
-    pub async fn journal_mode(&self) -> Result<String> {
-        let row = sqlx::query("PRAGMA journal_mode")
-            .fetch_one(&self.pool)
-            .await
-            .context("journal_mode check failed")?;
-        Ok(row.get::<String, _>("journal_mode"))
     }
 }

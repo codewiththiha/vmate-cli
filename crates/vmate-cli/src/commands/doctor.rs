@@ -25,8 +25,7 @@ pub async fn run(settings: &Settings) -> Result<()> {
                 format!("SQLite DB ({})", settings.db_path.display()),
                 "ok".to_string(),
             ]);
-            let repo = ConfigRepo::new(pool);
-            match repo.journal_mode().await {
+            match vmate_core::db::pool::journal_mode(&pool).await {
                 Ok(mode) if mode.eq_ignore_ascii_case("wal") => {
                     table.add_row(["WAL mode".to_string(), "ok".to_string()]);
                 }
@@ -38,6 +37,7 @@ pub async fn run(settings: &Settings) -> Result<()> {
                 }
             }
 
+            let repo = ConfigRepo::new(pool);
             let success = repo
                 .count_configs(ConfigStatus::Success)
                 .await

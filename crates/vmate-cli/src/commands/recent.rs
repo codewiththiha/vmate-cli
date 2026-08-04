@@ -68,12 +68,8 @@ fn print_plain(entries: &[StoredConfig]) -> Result<()> {
             .last_success_at
             .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_else(|| "-".to_string());
-        let path = if vmate_core::builtin::is_builtin_path(Path::new(&entry.path)) {
-            Path::new(&entry.path)
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or(&entry.path)
-                .to_string()
+        let path = if let Some(name) = vmate_core::builtin::display_name(Path::new(&entry.path)) {
+            name
         } else if term::stdout_is_tty() {
             hyperlink::osc8_file_hyperlink(&entry.path).unwrap_or_else(|| entry.path.clone())
         } else {

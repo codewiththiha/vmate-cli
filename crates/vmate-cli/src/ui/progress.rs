@@ -30,20 +30,7 @@ impl ProgressReporter {
         }
     }
 
-    fn update(&self, tested: Option<usize>, ok: Option<usize>, matched: Option<usize>) {
-        let mut state = match self.state.lock() {
-            Ok(s) => s,
-            Err(e) => e.into_inner(),
-        };
-        if let Some(t) = tested {
-            state.0 = t;
-        }
-        if let Some(o) = ok {
-            state.1 = o;
-        }
-        if let Some(m) = matched {
-            state.2 = m;
-        }
+    fn render(&self, state: &(usize, usize, usize)) {
         self.bar.set_position(state.0 as u64);
         self.bar.set_message(format!(
             "tested {} | ok {} | matched {}",
@@ -57,16 +44,31 @@ impl ScanProgress for ProgressReporter {
         self.bar.set_length(total as u64);
     }
 
-    fn tested(&self, n: usize) {
-        self.update(Some(n), None, None);
+    fn tested(&self) {
+        let mut state = match self.state.lock() {
+            Ok(s) => s,
+            Err(e) => e.into_inner(),
+        };
+        state.0 += 1;
+        self.render(&state);
     }
 
-    fn ok(&self, n: usize) {
-        self.update(None, Some(n), None);
+    fn ok(&self) {
+        let mut state = match self.state.lock() {
+            Ok(s) => s,
+            Err(e) => e.into_inner(),
+        };
+        state.1 += 1;
+        self.render(&state);
     }
 
-    fn matched(&self, n: usize) {
-        self.update(None, None, Some(n));
+    fn matched(&self) {
+        let mut state = match self.state.lock() {
+            Ok(s) => s,
+            Err(e) => e.into_inner(),
+        };
+        state.2 += 1;
+        self.render(&state);
     }
 
     fn success(&self, _path: &Path, _country: &CountryCode) {}
@@ -86,11 +88,11 @@ impl ScanProgress for VerboseReporter {
         println!("Testing {total} configs");
     }
 
-    fn tested(&self, _n: usize) {}
+    fn tested(&self) {}
 
-    fn ok(&self, _n: usize) {}
+    fn ok(&self) {}
 
-    fn matched(&self, _n: usize) {}
+    fn matched(&self) {}
 
     fn success(&self, path: &Path, country: &CountryCode) {
         println!("[SUCCESS] {} --- {}", path.display(), country);
