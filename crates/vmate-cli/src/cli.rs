@@ -106,21 +106,16 @@ pub struct ScanArgs {
     /// Maximum number of matched successful configs to collect.
     ///
     /// If --filter is used, this limit applies to matched filtered results.
-    #[arg(long, short = 'l', default_value_t = 100)]
-    pub limit: usize,
+    #[arg(long, short = 'l')]
+    pub limit: Option<usize>,
 
     /// Timeout for each OpenVPN test.
-    #[arg(
-        long,
-        short = 't',
-        default_value = "15s",
-        value_parser = parse_duration
-    )]
-    pub timeout: std::time::Duration,
+    #[arg(long, short = 't', value_parser = parse_duration)]
+    pub timeout: Option<std::time::Duration>,
 
     /// Maximum concurrent OpenVPN test processes.
-    #[arg(long, short = 'm', default_value_t = 64)]
-    pub max: usize,
+    #[arg(long, short = 'm')]
+    pub max: Option<usize>,
 
     /// Modify outdated cipher lines before testing.
     #[arg(long)]
