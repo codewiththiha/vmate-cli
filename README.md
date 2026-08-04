@@ -106,6 +106,12 @@ These apply to every subcommand:
 # --max/-m controls concurrency, --timeout/-t is per-test seconds.
 vmate-cli scan ~/configs --filter jp,kr --limit 20 --max 64 --timeout 15 -v
 
+# Scan the built-in vpn-gate remotes over UDP (no directory argument)
+vmate-cli scan --filter jp
+
+# Try the same built-in remotes over TCP instead
+vmate-cli scan --proto tcp
+
 # Do not write results to the database
 vmate-cli scan ~/configs --no-save
 
@@ -116,6 +122,12 @@ vmate-cli scan ~/configs --filter jp --export ./out
 `scan` tests every `.ovpn` file it finds, stores the successful ones in the
 database (so they show up in `vmate-cli recent` later), and reports the configs
 that match the current `--filter`.
+
+With no directory argument, `scan` materializes the built-in configs for the
+chosen provider and protocol into `~/.config/vmate-cli/builtin/<provider>/<proto>/`
+and scans those. `--provider` selects the built-in provider (default `vpn-gate`)
+and `--proto` selects the transport protocol (`udp` or `tcp`, default `udp`);
+re-scan with `--proto tcp` to try the other protocol.
 
 #### `connect` — connect with intelligent retry
 
@@ -163,6 +175,9 @@ its path too.
 # Scan, then connect using only the filtered matches
 vmate-cli all ~/configs --filter jp,kr
 
+# Scan the built-in vpn-gate remotes and connect (no directory argument)
+vmate-cli all --filter jp,kr
+
 # Scan and report only (do not connect)
 vmate-cli all ~/configs --no-connect
 
@@ -171,7 +186,9 @@ vmate-cli all ~/configs --filter jp --export ./out
 ```
 
 `all` runs a full scan (storing successes as usual), reports the matches, then
-hands them to the connect flow. `--no-connect` stops after the scan report.
+hands them to the connect flow. `--no-connect` stops after the scan report. As
+with `scan`, omitting the directory scans the built-in remotes for
+`--provider`/`--proto`.
 
 #### `export` — copy stored successful configs
 

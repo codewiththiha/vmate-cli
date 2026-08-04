@@ -19,6 +19,8 @@ use vmate_core::system::{
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
     require_root_for("run OpenVPN tests", settings.no_elevate)?;
 
+    let dir = resolve_scan_dir(args)?;
+
     let pool = init_pool(&settings.db_path).await?;
     let repo = Arc::new(ConfigRepo::new(pool));
     let killer: Arc<dyn ProcessKiller> = Arc::new(RealProcessKiller {
@@ -40,7 +42,7 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
     };
 
     let options = ScanOptions {
-        dir: args.dir.clone(),
+        dir,
         limit: args.limit,
         timeout: args.timeout,
         workers: args.max,
@@ -100,5 +102,95 @@ fn print_report(report: &ScanReport, settings: &Settings) {
     println!("Filter:        {}", report.filter);
     if report.saved_to_db {
         println!("Saved to database: {}", settings.db_path.display());
+    }
+}
+
+/// The directory to scan: an explicit one, or — when omitted — the built-in
+/// directory for the chosen provider + proto, materializing the configs first.
+fn resolve_scan_dir(args: &ScanArgs) -> Result<std::path::PathBuf> {
+    match &args.dir {
+        Some(dir) => Ok(dir.clone()),
+        None => materialize_builtins(&args.provider, &args.proto),
+    }
+}
+
+/// Materialize every built-in config for `provider`/`proto` into
+/// `builtin_dir/<provider>/<proto>/` and return that directory. Used by both
+/// `scan` and `all` when no explicit directory is given.
+pub fn materialize_builtins(provider: &str, proto: &str) -> Result<std::path::PathBuf> {
+    let provider = vmate_core::builtin::Provider::from_name(provider)
+        .ok_or_else(|| anyhow::anyhow!("unknown provider '{}'; available: vpn-gate", provider))?;
+    let proto = vmate_core::builtin::Proto::from_name(proto)
+        .ok_or_else(|| anyhow::anyhow!("invalid proto '{}'; use udp or tcp", proto))?;
+    let dir = vmate_core::paths::builtin_dir()?
+        .join(provider.name())
+        .join(proto.as_str());
+    let count = materialize_builtins_into(provider, proto, &dir)?;
+    println!(
+        "Scanning {} built-in configs ({} remotes, proto {})",
+        provider.name(),
+        count,
+        proto.as_str()
+    );
+    Ok(dir)
+}
+
+/// Write one `.ovpn` file per built-in config into `dir` and return the number
+/// written. Idempotent: existing files are overwritten.
+fn materialize_builtins_into(
+    provider: vmate_core::builtin::Provider,
+    proto: vmate_core::builtin::Proto,
+    dir: &std::path::Path,
+) -> Result<usize> {
+    let configs = vmate_core::builtin::enumerate(provider, proto);
+    std::fs::create_dir_all(dir)?;
+    for cfg in &configs {
+        vmate_core::builtin::materialize(cfg, dir)?;
+    }
+    Ok(configs.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn materialize_builtins_into_writes_one_file_per_remote() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = vmate_core::builtin::Provider::VpnGate;
+        let proto = vmate_core::builtin::Proto::Udp;
+        let expected = vmate_core::builtin::enumerate(provider, proto).len();
+        let count = materialize_builtins_into(provider, proto, dir.path()).unwrap();
+        assert_eq!(count, expected);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), expected);
+
+        // A known remote maps to the expected file with the built config.
+        let expected_path = dir.path().join("public-vpn-38.opengw.net-1195.ovpn");
+        let cfg = vmate_core::builtin::BuiltinConfig {
+            provider,
+            remote: "remote public-vpn-38.opengw.net 1195".to_string(),
+            proto,
+        };
+        assert_eq!(
+            std::fs::read_to_string(&expected_path).unwrap(),
+            vmate_core::builtin::build_config(&cfg)
+        );
+    }
+
+    #[test]
+    fn materialize_builtins_into_is_idempotent() {
+        let dir = tempfile::tempdir().unwrap();
+        let provider = vmate_core::builtin::Provider::VpnGate;
+        let proto = vmate_core::builtin::Proto::Tcp;
+        let first = materialize_builtins_into(provider, proto, dir.path()).unwrap();
+        let second = materialize_builtins_into(provider, proto, dir.path()).unwrap();
+        assert_eq!(first, second);
+        assert_eq!(std::fs::read_dir(dir.path()).unwrap().count(), first);
+    }
+
+    #[test]
+    fn materialize_builtins_rejects_unknown_provider_and_proto() {
+        assert!(materialize_builtins("nordvpn", "udp").is_err());
+        assert!(materialize_builtins("vpn-gate", "quic").is_err());
     }
 }
