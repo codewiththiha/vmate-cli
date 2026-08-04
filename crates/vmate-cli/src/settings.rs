@@ -15,6 +15,7 @@ pub struct Settings {
     pub no_elevate: bool,
     pub ipinfo_token: Option<String>,
     pub filter: CountryFilter,
+    pub save_defaults: bool,
 }
 
 impl Settings {
@@ -38,6 +39,7 @@ impl Settings {
             no_elevate: cli.no_elevate,
             ipinfo_token: cli.ipinfo_token.clone(),
             filter,
+            save_defaults: cli.save_defaults,
         })
     }
 }

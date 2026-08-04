@@ -21,6 +21,7 @@ pub mod hash;
 pub mod ovpn;
 pub mod paths;
 pub mod scan;
+pub mod settings;
 pub mod system;
 
 pub use country::{CountryCode, CountryError};
