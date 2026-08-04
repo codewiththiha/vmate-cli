@@ -105,8 +105,12 @@ The scan/connect tunables (`--max`, `--limit`, `--timeout`, `--connect-timeout`,
 `--save-defaults` alongside the value flags to persist them for future sessions:
 
 ```bash
-vmate-cli scan --save-defaults --max 500 --timeout 20
+vmate-cli scan --save-defaults --max 500 --timeout 20s
 ```
+
+The `scan` and `all` commands persist their workers (`--max`), `--limit`, and
+`--timeout` defaults this way; the value flags also apply for that run, and a
+plain `scan`/`all` resolves to the persisted values.
 
 Only the flags you **explicitly pass** are saved; unmentioned tunables keep
 their existing persisted or built-in default. Persisted settings live in

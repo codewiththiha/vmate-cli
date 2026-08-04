@@ -13,12 +13,16 @@ use vmate_core::db::pool::init_pool;
 use vmate_core::geo::IpInfoGeoLocator;
 use vmate_core::ovpn::process::{RealOpenVpnRunner, RealVpnTester, VpnTester};
 use vmate_core::scan::{ScanOptions, ScanProgress, ScanService};
+use vmate_core::settings::UserSettings;
 use vmate_core::system::{
     CleanupGuard, ProcessKiller, RealProcessKiller, require_root_for, shutdown_signal,
 };
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
     require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
+
+    let us = UserSettings::load();
+    let (workers, limit, timeout) = crate::commands::scan::resolve_scan_defaults(&args.scan, &us);
 
     let dir = match &args.scan.dir {
         Some(dir) => dir.clone(),
@@ -47,14 +51,18 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
 
     let scan_options = ScanOptions {
         dir,
-        limit: args.scan.limit,
-        timeout: args.scan.timeout,
-        workers: args.scan.max,
+        limit,
+        timeout,
+        workers,
         modify: args.scan.modify,
         backup: args.scan.backup,
         no_save: args.scan.no_save,
         filter: settings.filter.clone(),
     };
+
+    if settings.save_defaults {
+        crate::commands::scan::persist_scan_defaults(&args.scan)?;
+    }
 
     let cancel = CancellationToken::new();
     let cancel_task = cancel.clone();
