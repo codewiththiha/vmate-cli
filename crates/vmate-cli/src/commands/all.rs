@@ -12,15 +12,16 @@ use vmate_core::settings::UserSettings;
 use vmate_core::system::{ProcessKiller, RealProcessKiller, require_root_for};
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
-    // --save-defaults is a pure settings operation: persist and exit without
-    // scanning or connecting (no root, no OpenVPN, no DB needed).
+    // Elevate like a real run: the config dir may need sudo (e.g. left over
+    // from a previous elevated run), so --save-defaults must not skip it.
+    require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
+
+    // --save-defaults persists and exits without scanning or connecting.
     if settings.save_defaults {
         crate::commands::scan::persist_scan_defaults(&args.scan)?;
         persist_connect_defaults(&args.connect)?;
         return Ok(());
     }
-
-    require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let connect = resolve_connect(&us, &args.connect);

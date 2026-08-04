@@ -53,14 +53,15 @@ pub(crate) fn persist_connect_defaults(args: &ConnectArgs) -> Result<()> {
 }
 
 pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -> Result<()> {
-    // --save-defaults is a pure settings operation: persist and exit without
-    // connecting (no root, no OpenVPN, no DB needed).
+    // Elevate like a real run: the config dir may need sudo (e.g. left over
+    // from a previous elevated run), so --save-defaults must not skip it.
+    require_root_for("run OpenVPN connections", settings.no_elevate)?;
+
+    // --save-defaults persists and exits without connecting (no OpenVPN, no DB).
     if settings.save_defaults {
         persist_connect_defaults(args)?;
         return Ok(());
     }
-
-    require_root_for("run OpenVPN connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let resolved = resolve_connect(&us, args);
