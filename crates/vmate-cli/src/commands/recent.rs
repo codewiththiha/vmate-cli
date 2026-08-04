@@ -4,6 +4,7 @@ use crate::cli::RecentArgs;
 use crate::settings::Settings;
 use crate::ui::{clipboard, hyperlink, recent as recent_ui, term};
 use anyhow::Result;
+use std::path::Path;
 use vmate_core::db::ConfigRepo;
 use vmate_core::db::models::StoredConfig;
 use vmate_core::db::pool::init_pool;
@@ -67,7 +68,13 @@ fn print_plain(entries: &[StoredConfig]) -> Result<()> {
             .last_success_at
             .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
             .unwrap_or_else(|| "-".to_string());
-        let path = if term::stdout_is_tty() {
+        let path = if vmate_core::builtin::is_builtin_path(Path::new(&entry.path)) {
+            Path::new(&entry.path)
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or(&entry.path)
+                .to_string()
+        } else if term::stdout_is_tty() {
             hyperlink::osc8_file_hyperlink(&entry.path).unwrap_or_else(|| entry.path.clone())
         } else {
             entry.path.clone()

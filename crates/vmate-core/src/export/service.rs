@@ -54,16 +54,28 @@ pub fn unique_destination(dest_dir: &Path, desired: &str) -> PathBuf {
     candidate
 }
 
+/// Desired exported file name for a source config, honoring built-in naming.
+///
+/// Built-in configs export as `{provider}_{host}-{port}_{COUNTRY}.ovpn` (e.g.
+/// `vpn-gate_public-vpn-38.opengw.net-1195_JP.ovpn`) so the remote is visible;
+/// every other config keeps the country-prefixed `COUNTRY_<filename>` name.
+fn desired_name(src: &Path, country: &str) -> String {
+    crate::builtin::export_name(src, country).unwrap_or_else(|| {
+        sanitize_filename(
+            src.file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("config.ovpn"),
+            country,
+        )
+    })
+}
+
 /// Copy a single config into `dest` with a country-prefixed, deduplicated name.
 ///
 /// Returns whether the copy succeeded. A missing source or an IO error is
 /// logged and counted as not exported — never fatal.
 fn copy_config(src: &Path, country: &str, dest: &Path) -> bool {
-    let name = src
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("config.ovpn");
-    let desired = sanitize_filename(name, country);
+    let desired = desired_name(src, country);
     let dst = unique_destination(dest, &desired);
     match std::fs::copy(src, &dst) {
         Ok(_) => true,
@@ -135,6 +147,25 @@ mod tests {
         assert_eq!(sanitize_filename("a/b\\c:*.ovpn", "KR"), "KR_a_b_c__.ovpn");
         assert_eq!(sanitize_filename("config", "JP"), "JP_config");
         assert_eq!(sanitize_filename("", "JP"), "JP_config.ovpn");
+    }
+
+    #[test]
+    fn desired_name_uses_builtin_naming() {
+        let path = crate::paths::builtin_dir()
+            .unwrap()
+            .join("vpn-gate/udp/public-vpn-38.opengw.net-1195.ovpn");
+        assert_eq!(
+            desired_name(&path, "JP"),
+            "vpn-gate_public-vpn-38.opengw.net-1195_JP.ovpn"
+        );
+    }
+
+    #[test]
+    fn desired_name_keeps_sanitized_name_for_normal_paths() {
+        assert_eq!(
+            desired_name(Path::new("/configs/my config.ovpn"), "JP"),
+            "JP_my_config.ovpn"
+        );
     }
 
     #[test]
