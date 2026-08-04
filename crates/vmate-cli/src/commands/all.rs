@@ -20,15 +20,20 @@ use vmate_core::system::{
 };
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
+    // --save-defaults is a pure settings operation: persist and exit without
+    // scanning or connecting (no root, no OpenVPN, no DB needed).
+    if settings.save_defaults {
+        crate::commands::scan::persist_scan_defaults(&args.scan)?;
+        let mut us = UserSettings::load();
+        persist_connect_defaults(&mut us, &args.connect)?;
+        return Ok(());
+    }
+
     require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let (workers, limit, timeout) = crate::commands::scan::resolve_scan_defaults(&args.scan, &us);
     let connect = resolve_connect(&us, &args.connect);
-    if settings.save_defaults {
-        let mut us = UserSettings::load();
-        persist_connect_defaults(&mut us, &args.connect)?;
-    }
 
     let dir = match &args.scan.dir {
         Some(dir) => dir.clone(),
@@ -65,10 +70,6 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
         no_save: args.scan.no_save,
         filter: settings.filter.clone(),
     };
-
-    if settings.save_defaults {
-        crate::commands::scan::persist_scan_defaults(&args.scan)?;
-    }
 
     let cancel = CancellationToken::new();
     let cancel_task = cancel.clone();

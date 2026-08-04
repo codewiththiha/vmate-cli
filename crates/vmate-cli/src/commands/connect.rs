@@ -58,14 +58,18 @@ pub(crate) fn persist_connect_defaults(us: &mut UserSettings, args: &ConnectArgs
 }
 
 pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -> Result<()> {
+    // --save-defaults is a pure settings operation: persist and exit without
+    // connecting (no root, no OpenVPN, no DB needed).
+    if settings.save_defaults {
+        let mut us = UserSettings::load();
+        persist_connect_defaults(&mut us, args)?;
+        return Ok(());
+    }
+
     require_root_for("run OpenVPN connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let resolved = resolve_connect(&us, args);
-    if settings.save_defaults {
-        let mut us = UserSettings::load();
-        persist_connect_defaults(&mut us, args)?;
-    }
 
     let pool = init_pool(&settings.db_path).await?;
     let repo = Arc::new(ConfigRepo::new(pool));
