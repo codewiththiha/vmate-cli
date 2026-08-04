@@ -1,0 +1,38 @@
+# Lint + test gate on every push/PR to main.
+#
+# The README documents `cargo fmt --check`, `cargo clippy --all-targets
+# -- -D warnings`, and `cargo test` as the quality bar; this job enforces it
+# so nothing lands that doesn't pass its own checks. Releases are handled
+# separately by `release.yml` (tag-triggered).
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
