@@ -19,14 +19,15 @@ use vmate_core::system::{
 };
 
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
-    // --save-defaults is a pure settings operation: persist and exit without
-    // scanning (no root, no OpenVPN, no DB needed).
+    // Elevate like a real run: the config dir may need sudo (e.g. left over
+    // from a previous elevated run), so --save-defaults must not skip it.
+    require_root_for("run OpenVPN tests", settings.no_elevate)?;
+
+    // --save-defaults persists and exits without scanning (no OpenVPN, no DB).
     if settings.save_defaults {
         persist_scan_defaults(args)?;
         return Ok(());
     }
-
-    require_root_for("run OpenVPN tests", settings.no_elevate)?;
 
     scan_pipeline(settings, args, verbose).await?;
     Ok(())
