@@ -19,6 +19,13 @@ use vmate_core::system::{
 };
 
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
+    // --save-defaults is a pure settings operation: persist and exit without
+    // scanning (no root, no OpenVPN, no DB needed).
+    if settings.save_defaults {
+        persist_scan_defaults(args)?;
+        return Ok(());
+    }
+
     require_root_for("run OpenVPN tests", settings.no_elevate)?;
 
     let us = UserSettings::load();
@@ -56,10 +63,6 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         no_save: args.no_save,
         filter: settings.filter.clone(),
     };
-
-    if settings.save_defaults {
-        persist_scan_defaults(args)?;
-    }
 
     // Ctrl+C / SIGTERM cancels the scan; the cleanup guard kills any stale
     // OpenVPN processes on the way out.

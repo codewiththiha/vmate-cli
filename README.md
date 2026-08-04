@@ -109,19 +109,22 @@ vmate-cli scan    --save-defaults --max 500 --timeout 20
 vmate-cli connect --save-defaults --retry-count 5 --connect-timeout 10 --cooldown 60 --stability-grace 8
 ```
 
-The `scan` and `all` commands persist their workers (`--max`), `--limit`, and
-`--timeout` defaults; `connect`/`all` persist `--connect-timeout`, `--cooldown`,
-`--retry-count`, and `--stability-grace`. The value flags also apply for that
-run, and a plain command resolves to the persisted values. `--retry-count`
-controls how many times a failing config is retried before it is dropped from
-history; `--connect-timeout` is the handshake threshold, `--cooldown` the delay
-before retrying a recently-failed config, and `--stability-grace` how long a
-connected session must last before its crash resets the retry budget.
+`--save-defaults` **only writes the new defaults and exits** — it does not scan
+or connect (no root/OpenVPN needed). Run the command again without
+`--save-defaults` to actually scan/connect, resolving each value as
+`explicit flag → persisted → built-in default`. `scan`/`all` persist their
+workers (`--max`), `--limit`, and `--timeout` defaults; `connect`/`all` persist
+`--connect-timeout`, `--cooldown`, `--retry-count`, and `--stability-grace`.
+`--retry-count` controls how many times a failing config is retried before it is
+dropped from history; `--connect-timeout` is the handshake threshold,
+`--cooldown` the delay before retrying a recently-failed config, and
+`--stability-grace` how long a connected session must last before its crash
+resets the retry budget.
 
 Only the flags you **explicitly pass** are saved; unmentioned tunables keep
 their existing persisted or built-in default. Persisted settings live in
-`~/.config/vmate-cli/settings.json` and can be edited by hand. Each tunable is
-resolved as:
+`vmate-cli/settings.json` inside your config directory (printed when you save)
+and can be edited by hand. Each tunable is resolved as:
 
 ```
 explicit CLI flag → persisted setting → built-in default
