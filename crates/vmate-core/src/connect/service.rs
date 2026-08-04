@@ -1,8 +1,9 @@
 //! The connect orchestration: candidate loop and two-phase monitoring.
 //!
 //! Retry/drop semantics: a failed attempt — a handshake failure or a crash
-//! after connecting — retries the same config once, and a second failure
-//! removes the config from history entirely. A crash that follows a session
+//! after connecting — retries the same config up to
+//! [`ConnectOptions::retry_count`] failures, and the config is removed from
+//! history entirely once that budget is exhausted. A crash that follows a session
 //! stable for [`ConnectOptions::connect_stability_grace`] is a real
 //! connection and resets the budget, so a config that stays up for a while
 //! isn't dropped for two long-session crashes; a crash right after the
@@ -31,8 +32,11 @@ pub struct ConnectOptions {
     /// A connected session that survives this long after the handshake is a
     /// real connection: its crash resets the failure budget instead of
     /// counting against it. A crash sooner is connect-then-crash flakiness
-    /// and counts, so such configs still get dropped after `MAX_FAILURES`.
+    /// and counts, so such configs still get dropped after `retry_count`.
     pub connect_stability_grace: Duration,
+    /// How many failed attempts a config is allowed before it is dropped from
+    /// history (default 2).
+    pub retry_count: u32,
     pub killall_enabled: bool,
 }
 
@@ -48,8 +52,9 @@ impl ConnectService {
     pub async fn run(&self, mut queue: ConnectQueue, host: &mut dyn ConnectHost) -> Result<()> {
         let _guard = CleanupGuard::new(self.killer.clone(), self.options.killall_enabled);
         let cancel = CancellationToken::new();
-        // Go parity: try once, reconnect once, then drop from history.
-        const MAX_FAILURES: u32 = 2;
+        // Go parity: try once, reconnect once, then drop from history. The
+        // budget is configurable via ConnectOptions::retry_count.
+        let max_failures = self.options.retry_count;
 
         while let Some(first) = queue.next_candidate() {
             if cancel.is_cancelled() {
@@ -73,11 +78,11 @@ impl ConnectService {
                 } else {
                     match &last_reason {
                         Some(reason) => format!(
-                            "Retrying {} (failure {failures}/{MAX_FAILURES}): {reason}",
+                            "Retrying {} (failure {failures}/{max_failures}): {reason}",
                             candidate.country
                         ),
                         None => format!(
-                            "Retrying {} (failure {failures}/{MAX_FAILURES})",
+                            "Retrying {} (failure {failures}/{max_failures})",
                             candidate.country
                         ),
                     }
@@ -167,7 +172,7 @@ impl ConnectService {
                                     .await;
                                 failures += 1;
                                 last_reason = Some(reason.clone());
-                                if failures >= MAX_FAILURES {
+                                if failures >= max_failures {
                                     self.drop_candidate(&candidate, failures, host).await?;
                                     break;
                                 }
@@ -204,7 +209,7 @@ impl ConnectService {
                             .await;
                         failures += 1;
                         last_reason = Some(reason.clone());
-                        if failures >= MAX_FAILURES {
+                        if failures >= max_failures {
                             self.drop_candidate(&candidate, failures, host).await?;
                             break;
                         }
@@ -366,6 +371,7 @@ mod tests {
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
                 connect_stability_grace: Duration::from_secs(1),
+                retry_count: 2,
                 killall_enabled: false,
             },
         }
@@ -441,6 +447,7 @@ mod tests {
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
                 connect_stability_grace: Duration::from_secs(1),
+                retry_count: 2,
                 killall_enabled: false,
             },
         };
@@ -458,6 +465,172 @@ mod tests {
                 .await
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    /// Spawns `echo AUTH_FAILED` for the first two attempts and then hangs
+    /// (`sleep 30`), so a configurable retry budget can be observed mid-flight.
+    struct FailTwiceThenHang {
+        spawns: std::sync::atomic::AtomicUsize,
+    }
+
+    impl OpenVpnRunner for FailTwiceThenHang {
+        fn spawn(&self, _args: &[String]) -> Result<crate::ovpn::process::OpenVpnHandle> {
+            use std::sync::atomic::Ordering;
+            let n = self.spawns.fetch_add(1, Ordering::SeqCst);
+            if n < 2 {
+                crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "echo AUTH_FAILED".into()])
+            } else {
+                crate::ovpn::process::spawn_openvpn("sh", &["-c".into(), "sleep 30".into()])
+            }
+        }
+        fn bin(&self) -> &str {
+            "sh"
+        }
+    }
+
+    /// A host that returns `q` once it has observed the N-th
+    /// "Retrying ... (failure N/M)" status, letting the in-flight retry be
+    /// interrupted deterministically.
+    struct QuitAfterRetries {
+        failures_seen: usize,
+        quit_after: usize,
+    }
+
+    #[async_trait]
+    impl ConnectHost for QuitAfterRetries {
+        async fn status(&mut self, s: &ConnectionStatus) -> Result<()> {
+            if let Some(rest) = s.message.split("(failure ").nth(1) {
+                if let Some(n) = rest.split('/').next().and_then(|n| n.parse::<usize>().ok()) {
+                    self.failures_seen = self.failures_seen.max(n);
+                }
+            }
+            Ok(())
+        }
+        async fn notify(&mut self, _message: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn log(&mut self, _line: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn copy(&mut self, _text: &str) -> Result<()> {
+            Ok(())
+        }
+        async fn poll_command(&mut self) -> Option<UserCommand> {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            if self.failures_seen >= self.quit_after {
+                Some(UserCommand::Quit)
+            } else {
+                None
+            }
+        }
+        async fn finish(&mut self) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    /// A configurable retry budget: with `retry_count: 3`, a repeatedly-failing
+    /// config survives two failures and is only dropped on the third.
+    #[tokio::test]
+    async fn custom_retry_count_waits_for_that_many_failures() {
+        let dir = tempfile::tempdir().unwrap();
+        let repo = Arc::new(ConfigRepo::new(
+            init_pool(&dir.path().join("t.db")).await.unwrap(),
+        ));
+        let path = "/tmp/retry-3.ovpn";
+        let id = repo
+            .record_success(
+                std::path::Path::new(path),
+                "x",
+                None,
+                &CountryCode::new("jp").unwrap(),
+                CountrySource::FileName,
+            )
+            .await
+            .unwrap();
+
+        let make_service = |runner: Arc<dyn OpenVpnRunner>, repo: Arc<ConfigRepo>| {
+            let killer: Arc<dyn ProcessKiller> =
+                Arc::new(crate::system::killer::RealProcessKiller {
+                    killall_enabled: false,
+                });
+            ConnectService {
+                runner,
+                killer,
+                repo,
+                options: ConnectOptions {
+                    connect_timeout: Duration::from_secs(1),
+                    connect_stability_grace: Duration::from_secs(1),
+                    retry_count: 3,
+                    killall_enabled: false,
+                },
+            }
+        };
+
+        // Phase 1: two handshake failures, then interrupt the third attempt
+        // with `q` while its handshake hangs. Only two failures have accrued,
+        // so the config is still in history.
+        let mut host = QuitAfterRetries {
+            failures_seen: 0,
+            quit_after: 2,
+        };
+        let service = make_service(
+            Arc::new(FailTwiceThenHang {
+                spawns: std::sync::atomic::AtomicUsize::new(0),
+            }),
+            repo.clone(),
+        );
+        service
+            .run(
+                ConnectQueue::new(vec![Candidate {
+                    id,
+                    path: path.into(),
+                    country: "JP".into(),
+                }]),
+                &mut host,
+            )
+            .await
+            .unwrap();
+        assert!(
+            repo.config_by_path(std::path::Path::new(path))
+                .await
+                .unwrap()
+                .is_some(),
+            "with retry_count 3 a config must survive two failures"
+        );
+
+        // Phase 2: from a clean slate, three real failures drop the config.
+        let service = make_service(Arc::new(FailHandshakeRunner), repo.clone());
+        let mut host = FakeHost::new(vec![]);
+        service
+            .run(
+                ConnectQueue::new(vec![Candidate {
+                    id,
+                    path: path.into(),
+                    country: "JP".into(),
+                }]),
+                &mut host,
+            )
+            .await
+            .unwrap();
+        assert!(
+            repo.config_by_path(std::path::Path::new(path))
+                .await
+                .unwrap()
+                .is_none(),
+            "with retry_count 3 a config must be dropped on the third failure"
+        );
+
+        // The user-facing messages reflect the custom budget.
+        let statuses = host.statuses.lock().unwrap();
+        let msgs: Vec<&str> = statuses.iter().map(|s| s.message.as_str()).collect();
+        assert!(
+            msgs.iter().any(|m| m.contains("(failure 1/3)")),
+            "expected a (failure 1/3) message, got: {msgs:?}"
+        );
+        assert!(
+            msgs.iter().any(|m| m.contains("(failure 2/3)")),
+            "expected a (failure 2/3) message, got: {msgs:?}"
         );
     }
 
@@ -492,6 +665,7 @@ mod tests {
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(1),
                 connect_stability_grace: Duration::from_secs(1),
+                retry_count: 2,
                 killall_enabled: false,
             },
         };
@@ -597,6 +771,7 @@ mod tests {
                 // Far below the runner's ~0.2s uptime so each crash follows a
                 // "stable" session and resets the budget.
                 connect_stability_grace: Duration::from_millis(50),
+                retry_count: 2,
                 killall_enabled: false,
             },
         };
@@ -613,7 +788,7 @@ mod tests {
         service.run(queue, &mut host).await.unwrap();
 
         // Two long-session crashes each reset the budget (failures stayed at
-        // 1, never reaching MAX_FAILURES), so the config is still in history.
+        // 1, never reaching the retry budget), so the config is still in history.
         assert!(
             repo.config_by_path(std::path::Path::new(path))
                 .await
@@ -653,6 +828,7 @@ mod tests {
             options: ConnectOptions {
                 connect_timeout: Duration::from_secs(30), // quit must beat this
                 connect_stability_grace: Duration::from_secs(1),
+                retry_count: 2,
                 killall_enabled: false,
             },
         };

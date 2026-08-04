@@ -140,12 +140,8 @@ pub struct ConnectArgs {
     pub config: Option<PathBuf>,
 
     /// Timeout for the initial connection handshake.
-    #[arg(
-        long,
-        default_value = "5s",
-        value_parser = parse_duration
-    )]
-    pub connect_timeout: std::time::Duration,
+    #[arg(long, value_parser = parse_duration)]
+    pub connect_timeout: Option<std::time::Duration>,
 
     /// If an explicit config does not match --filter, reject it.
     ///
@@ -155,12 +151,17 @@ pub struct ConnectArgs {
     pub strict_filter: bool,
 
     /// Cooldown before retrying a config that recently failed.
-    #[arg(
-        long,
-        default_value = "30s",
-        value_parser = parse_duration
-    )]
-    pub cooldown: std::time::Duration,
+    #[arg(long, value_parser = parse_duration)]
+    pub cooldown: Option<std::time::Duration>,
+
+    /// Retries before a config is dropped from history (default 2).
+    #[arg(long)]
+    pub retry_count: Option<u32>,
+
+    /// How long a connected session must last before its crash resets the
+    /// retry budget (default 5s).
+    #[arg(long, value_parser = parse_duration)]
+    pub stability_grace: Option<std::time::Duration>,
 
     /// Disable interactive key handling.
     #[arg(long)]

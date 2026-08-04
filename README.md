@@ -101,16 +101,22 @@ These apply to every subcommand:
 ### Persisted defaults
 
 The scan/connect tunables (`--max`, `--limit`, `--timeout`, `--connect-timeout`,
-`--cooldown`, `--retry-count`, stability grace) have built-in defaults. Pass
+`--cooldown`, `--retry-count`, `--stability-grace`) have built-in defaults. Pass
 `--save-defaults` alongside the value flags to persist them for future sessions:
 
 ```bash
-vmate-cli scan --save-defaults --max 500 --timeout 20s
+vmate-cli scan    --save-defaults --max 500 --timeout 20
+vmate-cli connect --save-defaults --retry-count 5 --connect-timeout 10 --cooldown 60 --stability-grace 8
 ```
 
 The `scan` and `all` commands persist their workers (`--max`), `--limit`, and
-`--timeout` defaults this way; the value flags also apply for that run, and a
-plain `scan`/`all` resolves to the persisted values.
+`--timeout` defaults; `connect`/`all` persist `--connect-timeout`, `--cooldown`,
+`--retry-count`, and `--stability-grace`. The value flags also apply for that
+run, and a plain command resolves to the persisted values. `--retry-count`
+controls how many times a failing config is retried before it is dropped from
+history; `--connect-timeout` is the handshake threshold, `--cooldown` the delay
+before retrying a recently-failed config, and `--stability-grace` how long a
+connected session must last before its crash resets the retry budget.
 
 Only the flags you **explicitly pass** are saved; unmentioned tunables keep
 their existing persisted or built-in default. Persisted settings live in

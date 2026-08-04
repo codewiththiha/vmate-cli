@@ -1,6 +1,7 @@
 //! `vmate-cli all`: scan, store, then connect using only the filtered matches.
 
 use crate::cli::AllArgs;
+use crate::commands::connect::{persist_connect_defaults, resolve_connect};
 use crate::settings::Settings;
 use crate::ui::progress::{ProgressReporter, VerboseReporter};
 use anyhow::Result;
@@ -23,6 +24,11 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
 
     let us = UserSettings::load();
     let (workers, limit, timeout) = crate::commands::scan::resolve_scan_defaults(&args.scan, &us);
+    let connect = resolve_connect(&us, &args.connect);
+    if settings.save_defaults {
+        let mut us = UserSettings::load();
+        persist_connect_defaults(&mut us, &args.connect)?;
+    }
 
     let dir = match &args.scan.dir {
         Some(dir) => dir.clone(),
@@ -135,9 +141,10 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
         bin: settings.openvpn_bin.clone(),
     });
     let options = ConnectOptions {
-        connect_timeout: args.connect.connect_timeout,
+        connect_timeout: connect.connect_timeout,
         // A session this stable is real: its crash resets the retry budget.
-        connect_stability_grace: std::time::Duration::from_secs(5),
+        connect_stability_grace: connect.stability_grace,
+        retry_count: connect.retry_count,
         killall_enabled: settings.killall_enabled,
     };
 
