@@ -30,6 +30,11 @@ pub fn config_dir() -> Result<PathBuf> {
     Ok(dirs.config_dir().to_path_buf())
 }
 
+/// The directory that materialized built-in configs live under.
+pub fn builtin_dir() -> Result<PathBuf> {
+    Ok(config_dir()?.join("builtin"))
+}
+
 /// The default SQLite database path, creating the config directory if needed.
 pub fn default_db_path() -> Result<PathBuf> {
     let dir = config_dir()?;

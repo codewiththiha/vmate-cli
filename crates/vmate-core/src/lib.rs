@@ -9,6 +9,7 @@
 //! abstracted behind traits so that the behaviour can be unit tested with
 //! fakes and replaced in production.
 
+pub mod builtin;
 pub mod connect;
 pub mod country;
 pub mod db;
