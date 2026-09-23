@@ -2,8 +2,11 @@
 #
 # The README documents `cargo fmt --check`, `cargo clippy --all-targets
 # -- -D warnings`, and `cargo test` as the quality bar; this job enforces it
-# so nothing lands that doesn't pass its own checks. Releases are handled
-# separately by `release.yml` (tag-triggered).
+# so nothing lands that doesn't pass its own checks. Warnings are errors two
+# ways: clippy runs with `-D warnings` (so a rustc warning fails too), and the
+# workspace lints table promotes the rustc `unused` group to `deny`, so even a
+# plain `cargo check` — the step below — fails on dead code and unused imports.
+# Releases are handled separately by `release.yml` (tag-triggered).
 
 name: ci
 
@@ -17,8 +20,16 @@ permissions:
 
 jobs:
   check:
-    name: fmt + clippy + test
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Linux and macOS both: vmate-cli ships for both, and they differ
+        # exactly where it hurts (sudo resets HOME on Linux, process groups and
+        # `killall` behave differently), so a green Linux alone proves little.
+        os: [ubuntu-latest, macos-latest]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -31,8 +42,16 @@ jobs:
       - name: Format
         run: cargo fmt --check
 
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Clippy (warnings as errors)
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+
+      - name: Warnings (workspace lints deny unused code and unsafe)
+        run: cargo check --workspace --all-targets --locked
+
+      - name: Docs (broken links as errors)
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked

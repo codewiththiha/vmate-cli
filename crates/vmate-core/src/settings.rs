@@ -15,6 +15,7 @@
 //! built-in defaults.
 
 use crate::paths;
+use anyhow::Context;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -80,7 +81,19 @@ impl UserSettings {
             std::fs::create_dir_all(parent)?;
         }
         let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(path, json)?;
+        std::fs::write(path, json).with_context(|| {
+            format!(
+                "cannot write settings to {}\nhint: on Linux an earlier `sudo vmate-cli ...` run \
+                 may own it — remove the file or re-run with sudo once",
+                path.display()
+            )
+        })?;
+        // Keep an elevated `--save-defaults` from leaving a root-owned settings
+        // file behind for the next unprivileged run.
+        crate::system::repair_ownership(path);
+        if let Some(parent) = path.parent() {
+            crate::system::repair_ownership(parent);
+        }
         Ok(())
     }
 

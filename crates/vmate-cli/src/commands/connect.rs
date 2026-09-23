@@ -53,15 +53,16 @@ pub(crate) fn persist_connect_defaults(args: &ConnectArgs) -> Result<()> {
 }
 
 pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -> Result<()> {
-    // Elevate like a real run: the config dir may need sudo (e.g. left over
-    // from a previous elevated run), so --save-defaults must not skip it.
-    require_root_for("run OpenVPN connections", settings.no_elevate)?;
-
-    // --save-defaults persists and exits without connecting (no OpenVPN, no DB).
+    // --save-defaults persists and exits without connecting: it writes a single
+    // file, so it needs no elevation and must not block on a password prompt.
     if settings.save_defaults {
         persist_connect_defaults(args)?;
         return Ok(());
     }
+
+    // Connecting really does reconfigure the system (routes and the tunnel
+    // interface), so it needs root: elevate like a normal run.
+    require_root_for("run OpenVPN connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let resolved = resolve_connect(&us, args);
@@ -91,6 +92,11 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
         killall_enabled: settings.killall_enabled,
     });
     let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
+    // Raw mode turns Ctrl+C into a key event, so this only catches a real
+    // signal (--no-interactive, or one delivered before the TUI came up): it
+    // kills what we spawned and restores the terminal instead of leaving both
+    // behind.
+    let _signal_guard = crate::ui::term::SignalGuard::install(registry.clone());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
         registry: registry.clone(),

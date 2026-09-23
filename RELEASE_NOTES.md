@@ -1,37 +1,48 @@
-# vmate-cli v1.2.0
+# vmate-cli v1.2.1
 
 Prebuilt binaries for macOS (Apple Silicon and Intel) and Linux (x86_64 and
 arm64). Each zip contains the `vmate-cli` binary and `install.sh`, which copies
 the binary onto your PATH.
 
-## Built-in VPN configs
+## Linux: the database works again
 
-- `vmate-cli scan` with no directory scans the built-in vpn-gate remotes — the
-  shared key is embedded once and each config is built on the fly, so there are
-  no files to download. `--provider` selects the provider (default `vpn-gate`)
-  and `--proto udp|tcp` picks the transport (default `udp`); re-scan with
-  `--proto tcp` to try the other.
-- Built-in configs appear in `recent` by their remote (`host-port`), cache
-  their country like normal configs, and export as
-  `provider_host-port_COUNTRY.ovpn`.
+- **Fixed: scan results disappeared on Linux.** `sudo` on Linux resets `HOME`
+  to `/root`, so an elevated `vmate-cli scan` or `connect` stored its history in
+  `/root/.config/vmate-cli/vmate.db` while `vmate-cli recent` — which never
+  elevates — read `~/.config/vmate-cli/vmate.db` and reported nothing. macOS
+  `sudo` keeps `HOME`, which is why the same build behaved differently per
+  platform. vmate now re-applies your home, `XDG_*` and `VMATE_*` environment
+  across the `sudo` re-exec and hands every root-created config directory,
+  database, WAL sidecar and settings file back to your user.
+- `vmate-cli doctor` reports the platform, your home, the resolved config
+  directory and whether the database is really writable, and prints the
+  `chown` that repairs a database left root-owned by an older release.
+- The database is opened by path instead of through a `sqlite://` URL, so a
+  database path containing `?` can no longer be parsed as query parameters.
 
-## Persistent defaults
+## `scan` no longer asks for a password
 
-- `vmate-cli scan --save-defaults --max 500 --timeout 20s` saves those as the
-  defaults for future sessions; `vmate-cli connect --save-defaults
-  --retry-count 5 --connect-timeout 10s --cooldown 60s --stability-grace 8s`
-  does the same for the connect tunables. `--save-defaults` writes the new
-  defaults and exits — it does not scan or connect.
-- Each value resolves as `explicit flag → persisted setting → built-in
-  default`, so a plain `vmate-cli scan` uses what you saved and a one-off
-  `--max 200` still overrides for that run. Settings live in
-  `vmate-cli/settings.json` inside your config directory and are
-  human-editable.
+- Scanning only probes configs — it never rewrites routes or interfaces — so it
+  never blocks on a sudo prompt. When your sudo credentials are already cached
+  the run is elevated for free; otherwise it runs with the privileges it has
+  and hints at `sudo vmate-cli scan ...` only if every probe failed.
+- `--save-defaults` is a pure write, so it never elevates on any command.
 
-## Reliability
+## Snappier switching and quitting
 
-- A CI gate now runs `cargo fmt --check`, `cargo clippy`, and `cargo test` on
-  every push, so the documented quality bar is enforced.
-- Internal architecture pass: the retry/drop policy, built-in identity, and
-  process-teardown logic were consolidated, and the process-registry isolation
-  that had made the test suite flaky was fixed.
+- `n` (next config) and Ctrl+C no longer wait out the 3s teardown grace period:
+  a user-initiated switch escalates after 400ms, and shutdown cleanup polls for
+  the processes to exit instead of sleeping a fixed second.
+- Keys are polled every 50ms, so `n`, `r`, `c` and `q` land immediately and the
+  uptime clock keeps ticking smoothly.
+- A real SIGINT/SIGTERM — raw mode turns an interactive Ctrl+C into a key event
+  — now kills only the OpenVPN processes vmate spawned and restores the
+  terminal instead of leaving it in raw mode.
+
+## Housekeeping
+
+- CI runs on Linux *and* macOS, treats warnings as errors twice over (clippy
+  with `-D warnings`, plus a workspace lints table that promotes `unused` and
+  `unsafe_code` to errors) and fails on broken doc links.
+- Result blocks are separated by a consistent blank line, so a scan report
+  followed by an export summary no longer runs together.

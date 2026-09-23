@@ -12,10 +12,22 @@ use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Grace period between SIGTERM and SIGKILL when killing a process tree.
 pub const KILL_GRACE: Duration = Duration::from_secs(3);
+
+/// Grace period used when the *user* asked to move on — `n` (next config) or
+/// Ctrl+C. Waiting out [`KILL_GRACE`] there feels like the UI hung, so a switch
+/// escalates to SIGKILL far sooner; OpenVPN has nothing worth flushing on a
+/// config the user just abandoned.
+pub const SWITCH_GRACE: Duration = Duration::from_millis(400);
+
+/// Upper bound on the wait between SIGTERM and SIGKILL during shutdown cleanup.
+pub const CLEANUP_GRACE: Duration = Duration::from_millis(750);
+
+/// How often shutdown cleanup re-checks whether the processes are gone.
+const REAP_POLL: Duration = Duration::from_millis(25);
 
 /// PIDs of every OpenVPN process spawned in one session.
 ///
@@ -54,23 +66,62 @@ impl ProcessRegistry {
         self.pids.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
-    /// Kill every registered process group: SIGTERM all of them, allow one
-    /// grace period, then SIGKILL anything still alive, then clear.
+    /// Kill every registered process group: SIGTERM all of them, wait for them
+    /// to disappear (or [`CLEANUP_GRACE`]), then SIGKILL anything still alive.
     ///
-    /// Sync and best-effort: individual kill errors are ignored, and the grace
-    /// period is a fixed sleep because there is no live handle to wait on. This
-    /// is the last-resort safety net used by [`CleanupGuard::drop`].
+    /// Sync and best-effort: individual kill errors are ignored. The wait polls
+    /// instead of sleeping a fixed second, so a shutdown whose processes exited
+    /// on SIGTERM returns in milliseconds rather than pausing every single run.
+    /// This is the last-resort safety net used by [`CleanupGuard::drop`].
     pub fn kill_all_graceful(&self) {
         let pids = self.registered();
         for &pid in &pids {
             let _ = kill_process_group(pid);
         }
-        std::thread::sleep(Duration::from_secs(1));
+        self.wait_until_gone(&pids, CLEANUP_GRACE);
         for &pid in &pids {
             let _ = force_kill_process_group(pid);
         }
         self.clear();
     }
+
+    /// SIGTERM then immediately SIGKILL every registered process group.
+    ///
+    /// Used when the process is exiting *now* (Ctrl+C / SIGTERM outside raw
+    /// mode): a grace period there only delays the prompt coming back.
+    pub fn kill_all_immediate(&self) {
+        let pids = self.registered();
+        for &pid in &pids {
+            let _ = kill_process_group(pid);
+            let _ = force_kill_process_group(pid);
+        }
+        self.clear();
+    }
+
+    /// Block until every pid is gone or `grace` elapses — whichever comes
+    /// first. Returns as soon as the processes have actually exited.
+    fn wait_until_gone(&self, pids: &[u32], grace: Duration) {
+        let deadline = Instant::now() + grace;
+        loop {
+            if !pids.iter().copied().any(process_exists) {
+                return;
+            }
+            if Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(REAP_POLL);
+        }
+    }
+}
+
+/// Whether a process with this pid still exists.
+///
+/// Signal 0 is a permission/existence probe: `ESRCH` means the pid is gone.
+fn process_exists(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    kill(Pid::from_raw(pid as i32), None::<Signal>).is_ok()
 }
 
 /// SIGTERM the process group whose leader has the given pid. The child is
@@ -164,11 +215,22 @@ pub async fn kill_process_tree_graceful(
     pid: u32,
     child: &mut tokio::process::Child,
 ) {
+    kill_process_tree_with_grace(killer, pid, child, KILL_GRACE).await;
+}
+
+/// Kill a process tree with an explicit grace period: SIGTERM the group, wait
+/// up to `grace` for the child to exit, then SIGKILL the group.
+///
+/// [`KILL_GRACE`] is right for a normal teardown; [`SWITCH_GRACE`] keeps a
+/// user-initiated switch or quit from feeling like a hang.
+pub async fn kill_process_tree_with_grace(
+    killer: &dyn ProcessKiller,
+    pid: u32,
+    child: &mut tokio::process::Child,
+    grace: Duration,
+) {
     let _ = killer.kill_process_group(pid);
-    if tokio::time::timeout(KILL_GRACE, child.wait())
-        .await
-        .is_err()
-    {
+    if tokio::time::timeout(grace, child.wait()).await.is_err() {
         let _ = killer.force_kill_process_group(pid);
         let _ = child.wait().await;
     }
@@ -290,5 +352,52 @@ mod tests {
         assert!(killer.kill_process_group(0).is_ok());
         assert!(killer.force_kill_process_group(0).is_ok());
         assert!(killer.killall_openvpn().is_ok()); // disabled -> no-op
+    }
+
+    /// Shutdown must not pay a fixed sleep when the OpenVPN processes have
+    /// already exited — a stalled teardown is what makes Ctrl+C feel like a
+    /// hang.
+    #[tokio::test]
+    async fn cleanup_returns_as_soon_as_the_processes_are_gone() {
+        use crate::ovpn::process::spawn_openvpn;
+
+        let registry = ProcessRegistry::new();
+        let args = ["-c".to_string(), "exit 0".to_string()];
+        let mut handle = spawn_openvpn("sh", &args, &registry).unwrap();
+        handle.child.wait().await.unwrap();
+
+        let start = std::time::Instant::now();
+        registry.kill_all_graceful();
+        let elapsed = start.elapsed();
+
+        assert!(
+            elapsed < Duration::from_millis(500),
+            "cleanup waited {elapsed:?} for a process that had already exited"
+        );
+        assert!(registry.registered().is_empty());
+    }
+
+    /// A switch (`n`) or a quit escalates on `SWITCH_GRACE`, not `KILL_GRACE`,
+    /// even when the child ignores SIGTERM and has to be SIGKILLed.
+    #[tokio::test]
+    async fn switch_grace_escalates_faster_than_the_default_grace() {
+        use crate::ovpn::process::spawn_openvpn;
+
+        let registry = ProcessRegistry::new();
+        let args = ["-c".to_string(), "trap '' TERM; sleep 30".to_string()];
+        let mut handle = spawn_openvpn("sh", &args, &registry).unwrap();
+        let pid = handle.child.id().unwrap_or(0);
+        let killer = RealProcessKiller {
+            killall_enabled: false,
+        };
+
+        let start = std::time::Instant::now();
+        kill_process_tree_with_grace(&killer, pid, &mut handle.child, SWITCH_GRACE).await;
+        let elapsed = start.elapsed();
+
+        assert!(
+            elapsed < KILL_GRACE,
+            "switching took {elapsed:?}; it must not wait out the full teardown grace"
+        );
     }
 }
