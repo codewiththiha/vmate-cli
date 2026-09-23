@@ -31,9 +31,10 @@ from a keyboard-driven terminal UI backed by SQLite.
 
 - Rust **1.85+** (edition 2024)
 - [OpenVPN](https://openvpn.net/) — `openvpn` on `PATH`, or pass `--openvpn-bin`
-- Root/sudo for `scan`, `connect` and `all` (vmate-cli re-executes under `sudo`
-  automatically on an interactive terminal; set `VMATE_NO_ELEVATE=1` to run
-  without elevation — OpenVPN will likely fail)
+- Root/sudo for `connect` and `all`, which configure routes and the tunnel
+  interface. `scan` **never asks for a password** — it only probes configs — and
+  picks up root silently when your sudo credentials are already cached. Set
+  `VMATE_NO_ELEVATE=1` to skip elevation entirely (OpenVPN will likely fail)
 - `killall` (optional) only if you pass `--killall` for the global OpenVPN sweep
 
 ## Build & Test
@@ -244,7 +245,9 @@ instead.
 vmate-cli doctor
 ```
 
-Checks for OpenVPN, root access, and database health.
+Checks OpenVPN, `killall`, the database (journal mode and counts), storage
+ownership, and the platform/sudo environment — including whether an elevated
+run resolves the same config directory as a normal one.
 
 #### `completions` — shell completion scripts
 
@@ -338,9 +341,16 @@ failures, a `removed <file> from recent list` notice is shown briefly, and the
 Config line shows the `.ovpn` file name (not the full path).
 
 Pressing `n` gracefully kills the current OpenVPN process group (SIGTERM, then
-SIGKILL after the grace period), runs `killall -9 openvpn` too when `--killall`
-is enabled, marks the config as skipped (it is **not** deleted from history),
-and moves it to the end of a shuffled deferred queue.
+SIGKILL after a short switch grace period), runs `killall -9 openvpn` too when
+`--killall` is enabled, marks the config as skipped (it is **not** deleted from
+history), and moves it to the end of a shuffled deferred queue. A switch or a
+quit never waits out the full teardown grace period, so `n` and Ctrl+C hand the
+terminal back immediately.
+
+Keys are polled while a connection is being established as well as while it is
+up, so `n`, `r`, `c` and `q` respond during the handshake. Ctrl+C (and a real
+SIGINT/SIGTERM when the TUI is not in raw mode) restores the terminal and kills
+only the OpenVPN processes vmate spawned.
 
 ## Export
 
@@ -366,6 +376,14 @@ migrations run automatically on startup:
 ```bash
 sqlite3 ~/.config/vmate-cli/vmate.db "PRAGMA journal_mode;"   # → wal
 ```
+
+One history, elevated or not: `sudo` on Linux resets `HOME` to `/root`, which
+would otherwise give `sudo vmate-cli scan` and a plain `vmate-cli recent` two
+different databases. vmate re-applies your home and config environment across
+the `sudo` re-exec and hands any root-created database files back to you, so
+both halves of a session — and both platforms — see the same history. Any file
+that is already root-owned from an older release is reported by
+`vmate-cli doctor` together with the `chown` that fixes it.
 
 ## Architecture
 

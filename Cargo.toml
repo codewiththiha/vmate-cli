@@ -8,9 +8,17 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.85"
-version = "1.2.0"
+version = "1.2.1"
 license = "MIT"
 authors = ["codewiththiha"]
+
+# Warnings are errors for everything in this workspace (never for
+# dependencies). `unused` covers unused imports/variables and dead code, so a
+# plain `cargo check` — not just clippy — fails on them, and `unsafe_code`
+# keeps the process/signal code honest.
+[workspace.lints.rust]
+unused = "deny"
+unsafe_code = "deny"
 
 [workspace.dependencies]
 # Async runtime. Deliberately NOT `full`: vmate only needs process spawning,

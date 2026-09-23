@@ -9,8 +9,8 @@
 //! isn't dropped for two long-session crashes; a crash right after the
 //! handshake still counts, so a connect-then-crash config can't loop forever.
 //! Manual `n`/Next only defers the config (row stays in the DB); `r`/Reconnect
-//! is penalty-free. The per-candidate helpers live in [`super::session`]; the
-//! [`ConnectHost`] trait lives in [`super::host`].
+//! is penalty-free. The per-candidate helpers live in the session helper module;
+//! the [`ConnectHost`] trait is re-exported from [`crate::connect`].
 
 use crate::connect::host::ConnectHost;
 use crate::connect::queue::ConnectQueue;
@@ -94,12 +94,34 @@ pub struct ConnectService {
 
 impl ConnectService {
     pub async fn run(&self, mut queue: ConnectQueue, host: &mut dyn ConnectHost) -> Result<()> {
+        let cancel = CancellationToken::new();
+
+        // Ctrl+C / SIGTERM must break the loop even when the TUI cannot turn
+        // them into key events: raw mode swallows SIGINT, so with
+        // `--no-interactive` (or a signal that lands before the UI is up) this
+        // is the only way out that is not "wait for the current handshake".
+        let cancel_task = cancel.clone();
+        let signal_task = tokio::spawn(async move {
+            let _ = crate::system::shutdown_signal().await;
+            cancel_task.cancel();
+        });
+
+        let result = self.run_queue(&mut queue, host, &cancel).await;
+        signal_task.abort();
+        result
+    }
+
+    async fn run_queue(
+        &self,
+        queue: &mut ConnectQueue,
+        host: &mut dyn ConnectHost,
+        cancel: &CancellationToken,
+    ) -> Result<()> {
         let _guard = CleanupGuard::new(
             self.killer.clone(),
             self.registry.clone(),
             self.options.killall_enabled,
         );
-        let cancel = CancellationToken::new();
         // Go parity: try once, reconnect once, then drop from history. The
         // budget is configurable via ConnectOptions::retry_count.
         while let Some(first) = queue.next_candidate() {
@@ -169,14 +191,16 @@ impl ConnectService {
 
                 match outcome {
                     ConnectOutcome::Cancelled => {
-                        handle.kill_graceful(self.killer.as_ref()).await;
+                        // The user is leaving now: do not make them wait out
+                        // the teardown grace period.
+                        handle.kill_now(self.killer.as_ref()).await;
                         host.finish().await?;
                         return Ok(());
                     }
                     ConnectOutcome::Next => {
                         // User pressed `n` during the handshake: KEEP in DB,
                         // defer in-session, move to the next candidate.
-                        handle.kill_graceful(self.killer.as_ref()).await;
+                        handle.kill_now(self.killer.as_ref()).await;
                         let _ = self.repo.mark_skipped(candidate.id).await;
                         queue.skip(candidate);
                         break;
@@ -186,9 +210,16 @@ impl ConnectService {
                         last_reason = None;
                         let connected_at = std::time::Instant::now();
                         let exit = self
-                            .monitor_connected(&candidate, &mut handle, host, &cancel)
+                            .monitor_connected(&candidate, &mut handle, host, cancel)
                             .await?;
-                        handle.kill_graceful(self.killer.as_ref()).await; // targeted kill only
+                        // A switch or a quit escalates immediately; a crash or
+                        // a timeout keeps the graceful teardown.
+                        match exit {
+                            Phase2Exit::Quit | Phase2Exit::Next => {
+                                handle.kill_now(self.killer.as_ref()).await; // targeted kill only
+                            }
+                            _ => handle.kill_graceful(self.killer.as_ref()).await,
+                        }
                         match exit {
                             Phase2Exit::Quit => {
                                 host.finish().await?;

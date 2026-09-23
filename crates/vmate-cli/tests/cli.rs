@@ -91,6 +91,23 @@ fn invalid_filter_is_rejected() {
         .stderr(predicate::str::contains("invalid country code"));
 }
 
+/// `doctor` is how a user diagnoses a database that cannot be written to — the
+/// Linux failure this release fixes — so the rows that explain it must stay.
+#[test]
+fn doctor_reports_platform_config_dir_and_storage() {
+    let dir = tempfile::tempdir().unwrap();
+    let db = dir.path().join("vmate.db");
+    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
+    cmd.args(["doctor"])
+        .env("VMATE_DB", &db)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Platform"))
+        .stdout(predicate::str::contains("Config dir"))
+        .stdout(predicate::str::contains("DB access"))
+        .stdout(predicate::str::contains("Home"));
+}
+
 #[test]
 fn repeated_filter_flags_work() {
     let mut cmd = Command::cargo_bin("vmate-cli").unwrap();

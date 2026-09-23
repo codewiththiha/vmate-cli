@@ -12,16 +12,17 @@ use vmate_core::settings::UserSettings;
 use vmate_core::system::{ProcessKiller, RealProcessKiller, require_root_for};
 
 pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Result<()> {
-    // Elevate like a real run: the config dir may need sudo (e.g. left over
-    // from a previous elevated run), so --save-defaults must not skip it.
-    require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
-
-    // --save-defaults persists and exits without scanning or connecting.
+    // --save-defaults persists and exits without scanning or connecting: it
+    // writes one file, so it must not block on a password prompt.
     if settings.save_defaults {
         crate::commands::scan::persist_scan_defaults(&args.scan)?;
         persist_connect_defaults(&args.connect)?;
         return Ok(());
     }
+
+    // `all` connects at the end, and connecting reconfigures the system, so it
+    // needs root: elevate up front rather than re-running the scan afterwards.
+    require_root_for("run OpenVPN tests and connections", settings.no_elevate)?;
 
     let us = UserSettings::load();
     let connect = resolve_connect(&us, &args.connect);
@@ -36,6 +37,8 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     }
 
     if report.matched_configs.is_empty() {
+        // Blank line so this reads as its own block after the scan report.
+        println!();
         println!("No successful configs matched filter: {}", settings.filter);
         return Ok(());
     }
@@ -57,6 +60,9 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     let queue = ConnectQueue::new(candidates);
 
     let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
+    // Catches a real signal (raw mode turns Ctrl+C into a key event) so an
+    // interrupted session still cleans up and restores the terminal.
+    let _signal_guard = crate::ui::term::SignalGuard::install(registry.clone());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
         registry: registry.clone(),

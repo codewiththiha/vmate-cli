@@ -15,13 +15,16 @@ use vmate_core::ovpn::process::{RealVpnTester, VpnTester};
 use vmate_core::scan::{ScanOptions, ScanProgress, ScanReport, ScanService};
 use vmate_core::settings::UserSettings;
 use vmate_core::system::{
-    CleanupGuard, ProcessKiller, RealProcessKiller, require_root_for, shutdown_signal,
+    CleanupGuard, ProcessKiller, RealProcessKiller, elevate_without_prompt, is_root,
+    shutdown_signal,
 };
 
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
-    // Elevate like a real run: the config dir may need sudo (e.g. left over
-    // from a previous elevated run), so --save-defaults must not skip it.
-    require_root_for("run OpenVPN tests", settings.no_elevate)?;
+    // Scanning only *probes* configs — it never rewrites the system's routes or
+    // interfaces — so it must never block on a password prompt. When sudo
+    // credentials are already cached the run is elevated for free; otherwise it
+    // simply runs with the privileges it has.
+    elevate_without_prompt(settings.no_elevate);
 
     // --save-defaults persists and exits without scanning (no OpenVPN, no DB).
     if settings.save_defaults {
@@ -29,7 +32,16 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         return Ok(());
     }
 
-    scan_pipeline(settings, args, verbose).await?;
+    let (report, _repo) = scan_pipeline(settings, args, verbose).await?;
+
+    // Every probe failed and we were not root: on Linux OpenVPN needs root to
+    // open a tun device, so say so instead of leaving a silent wall of misses.
+    if !is_root() && !settings.no_elevate && report.scanned > 0 && report.success == 0 {
+        eprintln!(
+            "note: no config connected and vmate is not running as root\n\
+             hint: OpenVPN needs root to open a tun device — try `sudo vmate-cli scan ...`"
+        );
+    }
     Ok(())
 }
 
@@ -107,6 +119,9 @@ pub(crate) async fn scan_pipeline(
         let dest = vmate_core::paths::expand_path(export_dir);
         let result =
             vmate_core::export::export_configs_from_matches(&report.matched_configs, &dest).await?;
+        // Blank line so the export summary reads as its own block, not as
+        // another row of the report above it.
+        println!();
         println!(
             "Exported {} of {} configs to {}",
             result.exported,

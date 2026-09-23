@@ -69,6 +69,20 @@ impl OpenVpnHandle {
         )
         .await;
     }
+
+    /// Stop the process tree without waiting out the full grace period.
+    ///
+    /// Used when the user asked to move on — `n` (next config) or Ctrl+C —
+    /// where waiting on a process they just abandoned reads as a frozen UI.
+    pub async fn kill_now(&mut self, killer: &dyn ProcessKiller) {
+        crate::system::killer::kill_process_tree_with_grace(
+            killer,
+            self.child.id().unwrap_or(0),
+            &mut self.child,
+            crate::system::killer::SWITCH_GRACE,
+        )
+        .await;
+    }
 }
 
 /// Spawn OpenVPN in a new process group, registering the pid in `registry`.

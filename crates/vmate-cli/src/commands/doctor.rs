@@ -4,10 +4,10 @@ use crate::settings::Settings;
 use anyhow::Result;
 use comfy_table::Table;
 use std::io::IsTerminal;
+use std::path::Path;
 use vmate_core::db::ConfigRepo;
 use vmate_core::db::models::ConfigStatus;
 use vmate_core::db::pool::init_pool;
-use vmate_core::system::is_root;
 
 pub async fn run(settings: &Settings) -> Result<()> {
     let mut table = Table::new();
@@ -54,10 +54,20 @@ pub async fn run(settings: &Settings) -> Result<()> {
         }
     }
 
+    table.add_row(["Root".to_string(), vmate_core::system::root_summary()]);
     table.add_row([
-        "Root".to_string(),
-        if is_root() { "yes" } else { "no" }.to_string(),
+        "Platform".to_string(),
+        format!("{} / {}", std::env::consts::OS, std::env::consts::ARCH),
     ]);
+    table.add_row([
+        "Home".to_string(),
+        std::env::var("HOME").unwrap_or_else(|_| "-".to_string()),
+    ]);
+    match vmate_core::paths::config_dir() {
+        Ok(dir) => table.add_row(["Config dir".to_string(), dir.display().to_string()]),
+        Err(err) => table.add_row(["Config dir".to_string(), format!("error: {err}")]),
+    };
+    table.add_row(["DB access".to_string(), storage_status(&settings.db_path)]);
     table.add_row([
         "Terminal".to_string(),
         if std::io::stdout().is_terminal() {
@@ -94,6 +104,35 @@ pub async fn run(settings: &Settings) -> Result<()> {
 
     println!("{table}");
     Ok(())
+}
+
+/// Whether the database — and the directory holding it — can be used by the
+/// current user.
+///
+/// This is the check that makes the classic Linux failure visible: `sudo`
+/// resets `HOME` there, so an older elevated run could create (and later leave
+/// behind) a root-owned database that every normal run failed to open.
+fn storage_status(db_path: &Path) -> String {
+    let dir = match db_path.parent() {
+        Some(dir) if !dir.as_os_str().is_empty() => dir,
+        _ => Path::new("."),
+    };
+    if !vmate_core::paths::writable_by_current_user(dir) {
+        return format!("blocked ({} is not writable)", dir.display());
+    }
+    if !db_path.exists() {
+        return "ok (not created yet)".to_string();
+    }
+    if vmate_core::paths::writable_by_current_user(db_path) {
+        return "ok".to_string();
+    }
+    let owner = vmate_core::paths::owner_uid(db_path)
+        .map(|uid| uid.to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    format!(
+        "read-only (owned by uid {owner}) — fix with: sudo chown -R \"$(id -u):$(id -g)\" {}",
+        dir.display()
+    )
 }
 
 fn status_text(ok: bool) -> String {

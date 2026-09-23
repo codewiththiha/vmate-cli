@@ -28,6 +28,11 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 /// before reverting to the connected status.
 const MESSAGE_TTL: Duration = Duration::from_secs(3);
 
+/// How long `poll_command` blocks waiting for a key before re-rendering and
+/// yielding to the runtime. Short enough that `n`/`q`/Ctrl+C feel instant,
+/// long enough to keep redraws (and CPU) cheap.
+const KEY_POLL: Duration = Duration::from_millis(50);
+
 /// Whether a transient overlay came from the connect status (the fading
 /// "Connected successfully to X" confirmation) or from a user-facing notice
 /// (`notify`/`copy`, e.g. "removed ... from recent list"). A confirmation is
@@ -217,26 +222,34 @@ impl ConnectTui {
         if self.no_interactive {
             return None;
         }
-        if !event::poll(Duration::from_millis(200)).ok()? {
+        // Short poll: the connect loop redraws (and so updates the uptime
+        // clock) on every call, and a keypress must be picked up straight
+        // away instead of waiting out a long block.
+        if !event::poll(KEY_POLL).ok()? {
             return None;
         }
         match event::read().ok()? {
-            Event::Key(k) if k.kind == KeyEventKind::Press => match k.code {
-                // Ctrl+C quits (raw mode swallows SIGINT).
-                KeyCode::Char('c') if k.modifiers.contains(KeyModifiers::CONTROL) => {
-                    Some(UserCommand::Quit)
+            Event::Key(k) if k.kind == KeyEventKind::Press => {
+                // Ctrl+C quits (raw mode swallows SIGINT, so an interactive
+                // Ctrl+C can only ever be seen here).
+                if k.modifiers.contains(KeyModifiers::CONTROL)
+                    && matches!(k.code, KeyCode::Char('c') | KeyCode::Char('C'))
+                {
+                    return Some(UserCommand::Quit);
                 }
-                KeyCode::Char('n') => Some(UserCommand::Next),
-                KeyCode::Char('r') => Some(UserCommand::Reconnect),
-                KeyCode::Char('v') => {
-                    self.verbose = !self.verbose;
-                    Some(UserCommand::ToggleVerbose)
+                match k.code {
+                    KeyCode::Char('n') => Some(UserCommand::Next),
+                    KeyCode::Char('r') => Some(UserCommand::Reconnect),
+                    KeyCode::Char('v') => {
+                        self.verbose = !self.verbose;
+                        Some(UserCommand::ToggleVerbose)
+                    }
+                    KeyCode::Char('?') => Some(UserCommand::Help),
+                    KeyCode::Char('q') | KeyCode::Esc => Some(UserCommand::Quit),
+                    KeyCode::Char('c') => Some(UserCommand::CopyPath),
+                    _ => None,
                 }
-                KeyCode::Char('?') => Some(UserCommand::Help),
-                KeyCode::Char('q') | KeyCode::Esc => Some(UserCommand::Quit),
-                KeyCode::Char('c') => Some(UserCommand::CopyPath),
-                _ => None,
-            },
+            }
             _ => None,
         }
     }

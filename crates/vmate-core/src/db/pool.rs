@@ -5,7 +5,6 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::path::Path;
-use std::str::FromStr;
 
 /// The type of the shared SQLite connection pool.
 pub type DbPool = SqlitePool;
@@ -20,12 +19,11 @@ pub async fn init_pool(db_path: &Path) -> Result<DbPool> {
         }
     }
 
-    // SQLite treats a single leading slash specially, so `sqlite:///abs/path`
-    // is produced for absolute paths and `sqlite://rel/path` for relative ones.
-    let url = format!("sqlite://{}", db_path.display());
-
-    let options = SqliteConnectOptions::from_str(&url)
-        .with_context(|| format!("invalid SQLite URL: {url}"))?
+    // The database is opened by path, not through a `sqlite://` URL: URL
+    // parsing treats everything after the first `?` as query parameters, so a
+    // database path containing one would silently resolve somewhere else.
+    let options = SqliteConnectOptions::new()
+        .filename(db_path)
         .create_if_missing(true)
         .pragma("journal_mode", "WAL")
         .pragma("synchronous", "NORMAL")
@@ -36,13 +34,18 @@ pub async fn init_pool(db_path: &Path) -> Result<DbPool> {
         .max_connections(8)
         .connect_with(options)
         .await
-        .context("failed to open SQLite database")?;
+        .with_context(|| format!("failed to open SQLite database {}", db_path.display()))?;
 
     // Embed and run the migrations shipped with the crate.
     sqlx::migrate!("../../migrations")
         .run(&pool)
         .await
         .context("failed to run database migrations")?;
+
+    // An elevated run creates root-owned database files. Handing them back
+    // keeps one history shared between `sudo vmate-cli` and a normal run —
+    // on Linux, where `sudo` resets HOME, that is exactly what used to break.
+    repair_db_ownership(db_path);
 
     Ok(pool)
 }
@@ -54,4 +57,18 @@ pub async fn journal_mode(pool: &DbPool) -> Result<String> {
         .await
         .context("journal_mode check failed")?;
     Ok(row.get::<String, _>("journal_mode"))
+}
+
+/// Hand the database — and its WAL sidecars — back to the user who invoked
+/// sudo. Best effort: a failed chown must never fail a scan or a connect.
+fn repair_db_ownership(db_path: &Path) {
+    crate::system::repair_ownership(db_path);
+    if let Some(parent) = db_path.parent() {
+        crate::system::repair_ownership(parent);
+    }
+    for suffix in ["-wal", "-shm"] {
+        let mut sidecar = db_path.as_os_str().to_os_string();
+        sidecar.push(suffix);
+        crate::system::repair_ownership(Path::new(&sidecar));
+    }
 }

@@ -49,6 +49,8 @@ pub async fn run(settings: &Settings, args: &RecentArgs) -> Result<()> {
     if let Some(export_dir) = &args.export {
         let dest = vmate_core::paths::expand_path(export_dir);
         let result = vmate_core::export::export_configs(&repo, &settings.filter, &dest).await?;
+        // Blank line so the summary reads as its own block after the listing.
+        println!();
         println!(
             "Exported {} of {} configs to {}",
             result.exported,
