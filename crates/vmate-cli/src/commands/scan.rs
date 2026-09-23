@@ -15,16 +15,14 @@ use vmate_core::ovpn::process::{RealVpnTester, VpnTester};
 use vmate_core::scan::{ScanOptions, ScanProgress, ScanReport, ScanService};
 use vmate_core::settings::UserSettings;
 use vmate_core::system::{
-    CleanupGuard, ProcessKiller, RealProcessKiller, elevate_without_prompt, is_root,
-    shutdown_signal,
+    CleanupGuard, ProcessKiller, RealProcessKiller, require_root_for, shutdown_signal,
 };
 
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
-    // Scanning only *probes* configs — it never rewrites the system's routes or
-    // interfaces — so it must never block on a password prompt. When sudo
-    // credentials are already cached the run is elevated for free; otherwise it
-    // simply runs with the privileges it has.
-    elevate_without_prompt(settings.no_elevate);
+    // Elevate like a real run: OpenVPN requires root/CAP_NET_ADMIN to allocate
+    // the tun/tap device even for test probes, and the config dir may need
+    // sudo (e.g. left over from a previous elevated run).
+    require_root_for("run OpenVPN tests", settings.no_elevate)?;
 
     // --save-defaults persists and exits without scanning (no OpenVPN, no DB).
     if settings.save_defaults {
@@ -32,16 +30,7 @@ pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> R
         return Ok(());
     }
 
-    let (report, _repo) = scan_pipeline(settings, args, verbose).await?;
-
-    // Every probe failed and we were not root: on Linux OpenVPN needs root to
-    // open a tun device, so say so instead of leaving a silent wall of misses.
-    if !is_root() && !settings.no_elevate && report.scanned > 0 && report.success == 0 {
-        eprintln!(
-            "note: no config connected and vmate is not running as root\n\
-             hint: OpenVPN needs root to open a tun device — try `sudo vmate-cli scan ...`"
-        );
-    }
+    scan_pipeline(settings, args, verbose).await?;
     Ok(())
 }
 

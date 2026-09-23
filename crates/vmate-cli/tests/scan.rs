@@ -25,32 +25,6 @@ fn scan_empty_dir_succeeds() {
         .stdout(predicate::str::contains("Found matched: 0"));
 }
 
-/// Scanning only probes configs, so it must not demand a password. The absence
-/// of `VMATE_NO_ELEVATE` here is the point: an older release refused to run at
-/// all without it unless the process was already root.
-#[test]
-fn scan_does_not_require_root() {
-    let (dir, db) = tmp_db();
-    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["scan", dir.path().to_str().unwrap(), "--no-save"])
-        .env("VMATE_DB", &db)
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Found matched: 0"));
-}
-
-/// `--save-defaults` writes one file: it must not elevate on any command.
-#[test]
-fn scan_save_defaults_does_not_require_root() {
-    let home = tempfile::tempdir().expect("tempdir");
-    let mut cmd = Command::cargo_bin("vmate-cli").unwrap();
-    cmd.args(["scan", "--save-defaults", "--max", "42"])
-        .env("HOME", home.path())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Saved scan defaults"));
-}
-
 #[test]
 fn scan_missing_dir_fails_cleanly() {
     let (_, db) = tmp_db();
