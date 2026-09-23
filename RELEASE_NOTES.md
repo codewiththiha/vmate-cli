@@ -1,32 +1,25 @@
-# vmate-cli v1.2.1
+# vmate-cli v1.2.2
 
 Prebuilt binaries for macOS (Apple Silicon and Intel) and Linux (x86_64 and
 arm64). Each zip contains the `vmate-cli` binary and `install.sh`, which copies
 the binary onto your PATH.
 
-## Linux: the database works again
+## Linux: database fix retained & scan elevation restored
 
-- **Fixed: scan results disappeared on Linux.** `sudo` on Linux resets `HOME`
-  to `/root`, so an elevated `vmate-cli scan` or `connect` stored its history in
-  `/root/.config/vmate-cli/vmate.db` while `vmate-cli recent` — which never
-  elevates — read `~/.config/vmate-cli/vmate.db` and reported nothing. macOS
-  `sudo` keeps `HOME`, which is why the same build behaved differently per
-  platform. vmate now re-applies your home, `XDG_*` and `VMATE_*` environment
-  across the `sudo` re-exec and hands every root-created config directory,
-  database, WAL sidecar and settings file back to your user.
-- `vmate-cli doctor` reports the platform, your home, the resolved config
-  directory and whether the database is really writable, and prints the
-  `chown` that repairs a database left root-owned by an older release.
-- The database is opened by path instead of through a `sqlite://` URL, so a
-  database path containing `?` can no longer be parsed as query parameters.
-
-## `scan` no longer asks for a password
-
-- Scanning only probes configs — it never rewrites routes or interfaces — so it
-  never blocks on a sudo prompt. When your sudo credentials are already cached
-  the run is elevated for free; otherwise it runs with the privileges it has
-  and hints at `sudo vmate-cli scan ...` only if every probe failed.
-- `--save-defaults` is a pure write, so it never elevates on any command.
+- **Linux database fix:** `sudo` on Linux resets `HOME` to `/root`, which caused
+  elevated operations to write to `/root/.config/vmate-cli/vmate.db` instead of the
+  invoking user's database. vmate carries your user environment (`HOME`, `USER`,
+  `XDG_*`, `VMATE_*`) across the `sudo` re-exec and restores file ownership for
+  any root-created database, WAL sidecar, config directory, or settings file, so
+  `scan`, `connect`, and `recent` all share the exact same user history.
+- **Root elevation restored for `scan`:** OpenVPN fundamentally requires root
+  privileges (`CAP_NET_ADMIN`) to allocate the TUN device (`/dev/net/tun` on Linux
+  or `utun` on macOS). An unprivileged `scan` is unable to test any configurations.
+  `vmate-cli scan` now re-executes under `sudo` transparently as needed, while
+  ensuring the resulting database belongs to your normal user account.
+- **Diagnostics in `doctor`:** `vmate-cli doctor` checks platform, home, resolved
+  config directory, and database write access, giving actionable repair commands
+  if older runs left behind root-owned files.
 
 ## Snappier switching and quitting
 

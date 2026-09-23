@@ -4,7 +4,6 @@ use anyhow::{Result, bail};
 use nix::unistd::getuid;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
 
 /// Environment carried across a `sudo` re-exec so the elevated half resolves
 /// the same home, config directory, database and settings as the invoking
@@ -103,26 +102,6 @@ pub fn carried_environment() -> Vec<String> {
     assignments
 }
 
-/// Whether `sudo` can elevate without asking for a password — either the
-/// credential cache is warm or the user has a `NOPASSWD` rule.
-///
-/// `sudo -n` never prompts: it succeeds from the cache or fails outright.
-/// Commands that work unprivileged use this to pick up root for free instead
-/// of blocking the terminal on a password prompt.
-pub fn sudo_can_elevate_without_prompt() -> bool {
-    if is_root() {
-        return false;
-    }
-    std::process::Command::new("sudo")
-        .args(["-n", "-v"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|status| status.success())
-        .unwrap_or(false)
-}
-
 /// Ensure the process has root privileges for `context`.
 ///
 /// * Already root → returns.
@@ -156,24 +135,6 @@ pub fn require_root_for(context: &str, no_elevate: bool) -> Result<()> {
         );
     }
 
-    elevate_with_sudo()
-}
-
-/// Elevate only when it costs the user nothing.
-///
-/// Used by commands that do not need root to do their job (`scan`): when sudo
-/// credentials are already cached the run silently becomes root, and when they
-/// are not the command simply runs unprivileged. It never prompts.
-pub fn elevate_without_prompt(no_elevate: bool) {
-    if is_root() || no_elevate || is_elevated() {
-        return;
-    }
-    if std::env::var_os("VMATE_NO_ELEVATE").is_some() {
-        return;
-    }
-    if !interactive() || !sudo_can_elevate_without_prompt() {
-        return;
-    }
     elevate_with_sudo()
 }
 

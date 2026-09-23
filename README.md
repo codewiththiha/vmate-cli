@@ -31,10 +31,10 @@ from a keyboard-driven terminal UI backed by SQLite.
 
 - Rust **1.85+** (edition 2024)
 - [OpenVPN](https://openvpn.net/) — `openvpn` on `PATH`, or pass `--openvpn-bin`
-- Root/sudo for `connect` and `all`, which configure routes and the tunnel
-  interface. `scan` **never asks for a password** — it only probes configs — and
-  picks up root silently when your sudo credentials are already cached. Set
-  `VMATE_NO_ELEVATE=1` to skip elevation entirely (OpenVPN will likely fail)
+- Root/sudo for `scan`, `connect` and `all` (OpenVPN needs root/`CAP_NET_ADMIN`
+  to open `/dev/net/tun` or `utun`; vmate-cli re-executes under `sudo`
+  automatically on an interactive terminal, preserving `$HOME` so storage stays
+  under your user account. Set `VMATE_NO_ELEVATE=1` to run without elevation)
 - `killall` (optional) only if you pass `--killall` for the global OpenVPN sweep
 
 ## Build & Test
