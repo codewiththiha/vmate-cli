@@ -13,9 +13,8 @@
 //! built-in when it lives under [`paths::builtin_dir`].
 
 use std::fmt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use anyhow::{Context, Result};
 
 use crate::paths;
 
@@ -262,18 +261,8 @@ pub fn remote_host_port(remote: &str) -> Option<(&str, &str)> {
     Some((host, port))
 }
 
-/// Write the built config to `<dir>/<host>-<port>.ovpn`, creating the directory
-/// if needed, and return the path.
-pub fn materialize(cfg: &BuiltinConfig, dir: &Path) -> Result<PathBuf> {
-    let (host, port) = remote_host_port(&cfg.remote)
-        .with_context(|| format!("invalid remote line: {}", cfg.remote))?;
-    std::fs::create_dir_all(dir)
-        .with_context(|| format!("cannot create directory {}", dir.display()))?;
-    let path = dir.join(format!("{host}-{port}.ovpn"));
-    std::fs::write(&path, build_config(cfg))
-        .with_context(|| format!("cannot write {}", path.display()))?;
-    Ok(path)
-}
+mod storage;
+pub use storage::materialize;
 
 /// Whether a config path lives under the built-ins directory
 /// ([`paths::builtin_dir`]).
