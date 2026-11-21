@@ -29,10 +29,8 @@ type Term = Terminal<CrosstermBackend<Stdout>>;
 /// before reverting to the connected status.
 const MESSAGE_TTL: Duration = Duration::from_secs(3);
 
-/// How long `poll_command` blocks waiting for a key before re-rendering and
-/// yielding to the runtime. Short enough that `n`/`q`/Ctrl+C feel instant,
-/// long enough to keep redraws (and CPU) cheap.
-const KEY_POLL: Duration = Duration::from_millis(100);
+/// Maximum display refresh rate; keyboard delivery is independent.
+const RENDER_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Whether a transient overlay came from the connect status (the fading
 /// "Connected successfully to X" confirmation) or from a user-facing notice
@@ -87,7 +85,7 @@ impl ConnectTui {
             transient: None,
             verbose,
             input: InputReader::new(!no_interactive)?,
-            tick: tokio::time::interval(KEY_POLL),
+            tick: tokio::time::interval(RENDER_INTERVAL),
             filter,
             status: ConnectionStatus {
                 connected: false,
@@ -320,4 +318,13 @@ impl ConnectHost for ConnectTui {
 fn format_duration(d: Duration) -> String {
     let s = d.as_secs();
     format!("{:02}:{:02}:{:02}", s / 3600, (s % 3600) / 60, s % 60)
+}
+
+/// Select a terminal host or signal-driven plain reporting for pipes.
+pub fn host(no_interactive: bool, filter: String, verbose: bool) -> Result<Box<dyn ConnectHost>> {
+    use std::io::IsTerminal;
+    if no_interactive || !std::io::stdin().is_terminal() || !std::io::stdout().is_terminal() {
+        return Ok(Box::new(crate::ui::console::ConsoleHost { verbose }));
+    }
+    Ok(Box::new(ConnectTui::new(false, filter, verbose)?))
 }

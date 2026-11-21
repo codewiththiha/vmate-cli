@@ -59,3 +59,34 @@ fn connect_strict_filter_rejects_non_matching_explicit_config() {
     .failure()
     .stderr(predicate::str::contains("does not match filter"));
 }
+
+#[test]
+fn piped_noninteractive_connection_never_requires_a_terminal() {
+    use std::os::unix::fs::PermissionsExt;
+    let (dir, db) = tmp_db();
+    let config = dir.path().join("vpngate_jp.ovpn");
+    std::fs::write(&config, "client\nremote 127.0.0.1 1194\n").unwrap();
+    let fake = dir.path().join("fake-openvpn");
+    std::fs::write(
+        &fake,
+        "#!/bin/sh\necho 'Initialization Sequence Completed'\nsleep 0.05\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let mut command = Command::cargo_bin("vmate-cli").unwrap();
+    command
+        .args([
+            "--no-elevate",
+            "--db",
+            db.to_str().unwrap(),
+            "--openvpn-bin",
+            fake.to_str().unwrap(),
+            "connect",
+            config.to_str().unwrap(),
+            "--no-interactive",
+        ])
+        .timeout(std::time::Duration::from_secs(5))
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Connected successfully"));
+}

@@ -21,11 +21,15 @@ def exercise(binary, action, directory):
     fake.chmod(0o700)
     config = directory / 'jp.ovpn'
     config.write_text('client\ndev tun\nremote 127.0.0.1 11999\n')
+    command = [str(binary.resolve()), '--no-elevate', '--db', str(directory / 'db'),
+               '--openvpn-bin', str(fake), 'connect', str(config)]
+    return terminal_exit(command, action, dict(os.environ, TERM='xterm'))
+
+
+def terminal_exit(command, action, env):
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 40, 120, 0, 0))
-    process = subprocess.Popen([str(binary.resolve()), '--no-elevate', '--db', str(directory / 'db'),
-                                '--openvpn-bin', str(fake), 'connect', str(config)],
-                               stdin=slave, stdout=slave, stderr=slave, env=dict(os.environ, TERM='xterm'))
+    process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, env=env)
     os.close(slave)
     try:
         started = time.monotonic()
@@ -51,6 +55,30 @@ def exercise(binary, action, directory):
         os.close(master)
 
 
+def managed(binary, action, directory):
+    uuid = '01234567-89ab-cdef-0123-456789abcdef'
+    state = directory / 'active'
+    fake = directory / 'nmcli'
+    fake.write_text("""#!/bin/sh
+case "$*" in
+  *connection.type*) echo vpn ;;
+  *--active*) [ ! -f "$VMATE_TEST_STATE" ] || echo "$VMATE_TEST_UUID" ;;
+  *"connection up"*) touch "$VMATE_TEST_STATE" ;;
+  *"connection down"*) rm -f "$VMATE_TEST_STATE" ;;
+  *) exit 1 ;;
+esac
+exit 0
+""")
+    fake.chmod(0o700)
+    env = dict(os.environ, PATH=str(directory) + ':' + os.environ['PATH'], TERM='xterm',
+               VMATE_TEST_STATE=str(state), VMATE_TEST_UUID=uuid)
+    result = terminal_exit([str(binary.resolve()), 'managed', uuid], action, env)
+    if state.exists():
+        raise RuntimeError('managed profile was not deactivated')
+    result['backend'] = 'mock NetworkManager'
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('binary', type=Path)
@@ -61,6 +89,10 @@ def main():
             directory = Path(temp) / action
             directory.mkdir()
             results.append(exercise(args.binary, action, directory))
+            if __import__('sys').platform == 'linux':
+                managed_dir = directory / 'managed'
+                managed_dir.mkdir()
+                results.append(managed(args.binary, action, managed_dir))
     print(json.dumps(results, indent=2))
 
 

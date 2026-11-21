@@ -104,7 +104,7 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
         killall_enabled: settings.killall_enabled,
     };
 
-    let mut host = crate::ui::connect::ConnectTui::new(
+    let mut host = crate::ui::connect::host(
         args.no_interactive,
         settings.filter.to_display(),
         crate::app::is_verbose(verbose),
@@ -116,7 +116,7 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
         repo,
         options,
     };
-    service.run(queue, &mut host).await?;
+    service.run(queue, host.as_mut()).await?;
     Ok(())
 }
 

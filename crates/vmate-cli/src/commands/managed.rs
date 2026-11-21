@@ -19,14 +19,14 @@ pub async fn run(uuid: &str) -> Result<()> {
     if active(uuid).await? {
         bail!("profile is already active; refusing to take ownership of another session");
     }
-    let mut host = crate::ui::connect::ConnectTui::new(false, String::new(), false)?;
+    let mut host = crate::ui::connect::host(false, String::new(), false)?;
     let cancel = CancellationToken::new();
     let signal = vmate_core::system::signal::cancel_on_shutdown(cancel.clone());
     let mut lease = ProfileLease {
         uuid,
         closed: false,
     };
-    let result = session(uuid, &mut host, &cancel).await;
+    let result = session(uuid, host.as_mut(), &cancel).await;
     let cleanup = nm(&["connection", "down", "uuid", uuid]).await;
     lease.closed = cleanup.is_ok() || matches!(active(uuid).await, Ok(false));
     drop(signal);

@@ -2,6 +2,7 @@
 
 pub mod clipboard;
 pub mod connect;
+mod console;
 pub mod hyperlink;
 mod input;
 pub mod progress;
