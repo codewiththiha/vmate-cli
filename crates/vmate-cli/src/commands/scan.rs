@@ -85,7 +85,7 @@ pub(crate) async fn scan_pipeline(
 
     let result = service.scan(&options, progress, cancel.clone()).await;
     drop(signal_task);
-    input.finish().await;
+    drop(input);
     let mut report = result?;
     if cancel.is_cancelled() {
         report.matched_configs.clear();

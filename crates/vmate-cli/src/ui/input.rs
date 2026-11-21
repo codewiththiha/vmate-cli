@@ -19,9 +19,8 @@ pub(super) struct InputReader {
 }
 
 impl InputReader {
-    pub(super) fn new(enabled: bool) -> Result<Self> {
+    pub(super) fn new(enabled: bool, quit: CancellationToken) -> Result<Self> {
         let (sender, events) = mpsc::channel(32);
-        let quit = CancellationToken::new();
         let stop = Arc::new(AtomicBool::new(false));
         let worker_stop = stop.clone();
         let worker_quit = quit.clone();
@@ -116,7 +115,7 @@ mod tests {
 
     #[tokio::test]
     async fn quit_does_not_wait_behind_a_full_queue() {
-        let mut input = InputReader::new(false).unwrap();
+        let mut input = InputReader::new(false, CancellationToken::new()).unwrap();
         input.quit.cancel();
         assert_eq!(input.next().await, Some(UserCommand::Quit));
     }

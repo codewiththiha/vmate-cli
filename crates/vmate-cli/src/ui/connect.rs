@@ -84,7 +84,7 @@ impl ConnectTui {
             connected_since: None,
             transient: None,
             verbose,
-            input: InputReader::new(!no_interactive)?,
+            input: InputReader::new(!no_interactive, tokio_util::sync::CancellationToken::new())?,
             tick: tokio::time::interval(RENDER_INTERVAL),
             filter,
             status: ConnectionStatus {
