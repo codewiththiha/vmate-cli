@@ -56,6 +56,7 @@ impl ScanService {
         let counts = Arc::new(Counts::default());
         let results: Arc<Mutex<Vec<ScanMatch>>> = Arc::new(Mutex::new(Vec::new()));
         let mut join_set = JoinSet::new();
+        let fatal = Arc::new(Mutex::new(None));
 
         for path in paths {
             if cancel.is_cancelled() {
@@ -69,6 +70,7 @@ impl ScanService {
                 permit = semaphore.clone().acquire_owned() => permit?,
             };
 
+            let fatal = fatal.clone();
             let tester = self.tester.clone();
             let geo = self.geo.clone();
             let repo = self.repo.clone();
@@ -90,8 +92,9 @@ impl ScanService {
                 let ok = match tester.test(&path, timeout, cancel.clone()).await {
                     Ok(v) => v,
                     Err(e) => {
-                        tracing::debug!(path = %path.display(), error = %e, "test failed");
-                        false
+                        fatal.lock().get_or_insert(e);
+                        cancel.cancel();
+                        return;
                     }
                 };
 
@@ -156,23 +159,11 @@ impl ScanService {
             }
         }
 
-        let mut matched_configs = {
-            let mut results = results.lock();
-            std::mem::take(&mut *results)
-        };
-        matched_configs.sort_by(|a, b| a.path.cmp(&b.path));
-
         progress.finish();
-
-        Ok(ScanReport {
-            scanned: total,
-            tested: counts.tested.load(Ordering::SeqCst),
-            success: counts.ok.load(Ordering::SeqCst),
-            matched: matched_configs.len(),
-            matched_configs,
-            saved_to_db: !options.no_save,
-            filter: options.filter.to_display(),
-        })
+        if let Some(error) = fatal.lock().take() {
+            return Err(error);
+        }
+        Ok(finish_report(options, total, &counts, &results))
     }
 }
 
@@ -220,5 +211,24 @@ async fn lookup_country(
             country: CountryCode::unknown(),
             source: CountrySource::Unknown,
         }),
+    }
+}
+
+fn finish_report(
+    options: &ScanOptions,
+    total: usize,
+    counts: &Counts,
+    results: &Mutex<Vec<ScanMatch>>,
+) -> ScanReport {
+    let mut matched_configs = std::mem::take(&mut *results.lock());
+    matched_configs.sort_by(|a, b| a.path.cmp(&b.path));
+    ScanReport {
+        scanned: total,
+        tested: counts.tested.load(Ordering::SeqCst),
+        success: counts.ok.load(Ordering::SeqCst),
+        matched: matched_configs.len(),
+        matched_configs,
+        saved_to_db: !options.no_save,
+        filter: options.filter.to_display(),
     }
 }

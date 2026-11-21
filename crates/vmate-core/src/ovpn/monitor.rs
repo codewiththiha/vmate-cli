@@ -36,6 +36,21 @@ pub fn classify_line(line: &str) -> VpnLineClass {
     VpnLineClass::Info
 }
 
+/// Identify local setup failures that must not consume a relay retry budget.
+pub fn local_failure(line: &str) -> Option<&'static str> {
+    [
+        "Options error:",
+        "Cannot open TUN/TAP dev",
+        "Cannot open tun/tap dev",
+        "TUNSETIFF failed",
+        "Operation not permitted",
+        "Permission denied",
+        "Too many open files",
+    ]
+    .into_iter()
+    .find(|keyword| line.contains(keyword))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

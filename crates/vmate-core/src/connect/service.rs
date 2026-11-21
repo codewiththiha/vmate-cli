@@ -19,7 +19,9 @@ use crate::connect::state::ConnectionStatus;
 use crate::db::ConfigRepo;
 use crate::ovpn::process::{ConnectOutcome, OpenVpnRunner, connect_args, monitor_connect};
 use crate::system::killer::{CleanupGuard, ProcessKiller, ProcessRegistry};
-use anyhow::Result;
+use anyhow::{Result, bail};
+
+mod failure;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -182,10 +184,18 @@ impl ConnectService {
                 .await;
 
                 match outcome {
+                    ConnectOutcome::LocalError(reason) => {
+                        handle.kill_graceful(self.killer.as_ref()).await;
+                        handle.ensure_stopped()?;
+                        host.finish().await?;
+                        bail!("local OpenVPN failure: {reason}; relay history preserved");
+                    }
+
                     ConnectOutcome::Cancelled => {
                         // The user is leaving now: do not make them wait out
                         // the teardown grace period.
                         handle.kill_now(self.killer.as_ref()).await;
+                        handle.ensure_stopped()?;
                         host.finish().await?;
                         return Ok(());
                     }
@@ -193,6 +203,7 @@ impl ConnectService {
                         // User pressed `n` during the handshake: KEEP in DB,
                         // defer in-session, move to the next candidate.
                         handle.kill_now(self.killer.as_ref()).await;
+                        handle.ensure_stopped()?;
                         let _ = self.repo.mark_skipped(candidate.id).await;
                         queue.skip(candidate);
                         break;
@@ -206,6 +217,7 @@ impl ConnectService {
                             .await;
                         let _ = host.notify("Disconnecting OpenVPN...").await;
                         handle.kill_graceful(self.killer.as_ref()).await;
+                        handle.ensure_stopped()?;
                         let exit = exit?;
                         match exit {
                             Phase2Exit::Quit => {
@@ -251,25 +263,9 @@ impl ConnectService {
                     }
                     bad => {
                         // Handshake failure: Error / RestartPause / TimedOut / Exited.
-                        let reason = match bad {
-                            ConnectOutcome::Error(m) => format!("connection error: {m}"),
-                            ConnectOutcome::RestartPause => "restart pause".to_string(),
-                            ConnectOutcome::TimedOut => "connection timed out".to_string(),
-                            ConnectOutcome::Exited => {
-                                "openvpn exited before connecting".to_string()
-                            }
-                            // Connected/Cancelled/Next are matched above; this
-                            // arm is unreachable for them, but keeping the
-                            // variants explicit makes future ConnectOutcome
-                            // additions a compile error instead of a silent
-                            // panic.
-                            ConnectOutcome::Connected
-                            | ConnectOutcome::Cancelled
-                            | ConnectOutcome::Next => {
-                                unreachable!()
-                            }
-                        };
-                        handle.kill_graceful(self.killer.as_ref()).await; // targeted kill only
+                        let reason = failure::reason(bad);
+                        handle.kill_graceful(self.killer.as_ref()).await;
+                        handle.ensure_stopped()?;
                         let _ = self
                             .repo
                             .note_connect_failure(Path::new(&candidate.path))

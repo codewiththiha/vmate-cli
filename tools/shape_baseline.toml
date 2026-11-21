@@ -5,9 +5,9 @@
 [functions]
 "crates/vmate-cli/src/commands/doctor.rs::run#0" = 96
 "crates/vmate-cli/src/ui/connect.rs::draw#0" = 120
-"crates/vmate-core/src/connect/service.rs::run_queue#0" = 181
+"crates/vmate-core/src/connect/service.rs::run_queue#0" = 175
 "crates/vmate-core/src/connect/service/tests/handshake.rs::custom_retry_count_waits_for_that_many_failures#0" = 117
-"crates/vmate-core/src/scan/service.rs::scan#0" = 129
+"crates/vmate-core/src/scan/service.rs::scan#0" = 120
 
 [duplicates]
 

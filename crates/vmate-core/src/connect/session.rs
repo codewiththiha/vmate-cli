@@ -62,6 +62,9 @@ impl ConnectService {
                         return Ok(Phase2Exit::Crashed("openvpn exited unexpectedly".into()));
                     };
                     let _ = host.log(&line).await;
+                    if let Some(reason) = crate::ovpn::monitor::local_failure(&line) {
+                        anyhow::bail!("local OpenVPN failure: {reason}; relay history preserved");
+                    }
                     match classify_line(&line) {
                         VpnLineClass::Error(kw) => {
                             return Ok(Phase2Exit::Crashed(format!("connection error: {kw}")));

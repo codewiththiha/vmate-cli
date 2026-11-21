@@ -3,7 +3,7 @@
 use crate::connect::{ConnectHost, UserCommand};
 use crate::ovpn::monitor::{VpnLineClass, classify_line};
 use crate::system::killer::{ProcessKiller, ProcessRegistry};
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -65,6 +65,14 @@ pub struct OpenVpnHandle {
 }
 
 impl OpenVpnHandle {
+    /// Confirm teardown completed before retrying or reporting success.
+    pub fn ensure_stopped(&mut self) -> Result<()> {
+        if self.child.try_wait()?.is_none() {
+            bail!("OpenVPN did not stop; refusing to start another tunnel");
+        }
+        Ok(())
+    }
+
     /// Stop the process tree gracefully: SIGTERM the group, wait up to
     /// `KILL_GRACE`, then SIGKILL stragglers. The handle owns its teardown, so
     /// callers never reach for the raw pid or a kill policy.
@@ -208,6 +216,7 @@ impl OpenVpnRunner for RealOpenVpnRunner {
 /// Outcome of watching a short-lived test connection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MonitorOutcome {
+    LocalError(String),
     Success,
     Error(String),
     RestartPause,
@@ -219,6 +228,7 @@ pub enum MonitorOutcome {
 /// Outcome of the connect handshake phase.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConnectOutcome {
+    LocalError(String),
     Connected,
     Error(String),
     RestartPause,
@@ -245,6 +255,9 @@ pub async fn monitor_test(
             _ = cancel.cancelled() => return MonitorOutcome::Cancelled,
             line = lines.recv() => {
                 let Some(line) = line else { return MonitorOutcome::Exited };
+                if let Some(reason) = crate::ovpn::monitor::local_failure(&line) {
+                    return MonitorOutcome::LocalError(reason.into());
+                }
                 match classify_line(&line) {
                     VpnLineClass::Success => return MonitorOutcome::Success,
                     VpnLineClass::Error(kw) => return MonitorOutcome::Error(kw.to_string()),
@@ -278,6 +291,9 @@ pub async fn monitor_connect(
                 // Feed the verbose log; a render failure must not abort the
                 // handshake, so the outcome is what matters.
                 let _ = host.log(&line).await;
+                if let Some(reason) = crate::ovpn::monitor::local_failure(&line) {
+                    return ConnectOutcome::LocalError(reason.into());
+                }
                 match classify_line(&line) {
                     VpnLineClass::Success => return ConnectOutcome::Connected,
                     VpnLineClass::Error(kw) => return ConnectOutcome::Error(kw.to_string()),
@@ -317,6 +333,10 @@ pub async fn test_openvpn_config(
 
     // Always clean up the process tree; never leak workers.
     handle.kill_graceful(killer).await;
+    handle.ensure_stopped()?;
+    if let MonitorOutcome::LocalError(reason) = outcome {
+        bail!("local OpenVPN failure: {reason}; relay history preserved");
+    }
 
     Ok(matches!(outcome, MonitorOutcome::Success))
 }
