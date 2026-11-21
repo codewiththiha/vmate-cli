@@ -12,7 +12,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/linux-session-lifecycle]
   pull_request:
 
 permissions:

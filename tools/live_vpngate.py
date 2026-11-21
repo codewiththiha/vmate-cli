@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Exercise built-in public relays inside a disposable privileged container."""
 import json
+import fcntl
+import struct
+import termios
 import os
 import pty
 import select
@@ -34,6 +37,7 @@ def no_children():
 
 def session(config, action):
     master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     command = [BIN, '--db', '/tmp/live.db', 'connect', str(config),
                '--connect-timeout', '25s', '--retry-count', '1']
     process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, env=ENV)
@@ -41,6 +45,7 @@ def session(config, action):
     output = bytearray()
     connected = False
     restarted = action != 'r'
+    saw_reconnecting = False
     deadline = time.monotonic() + 100
     try:
         while time.monotonic() < deadline and process.poll() is None:
@@ -51,6 +56,9 @@ def session(config, action):
             except OSError:
                 break
             output.extend(data)
+            if connected and action == 'r' and b'Reconnecting to' in output:
+                saw_reconnecting = True
+                output.clear()
             if b'Connected successfully' not in output:
                 continue
             if not connected:
@@ -62,7 +70,7 @@ def session(config, action):
                     process.send_signal(signal.SIGTERM)
                 else:
                     os.write(master, b'q')
-            elif not restarted and b'Connected successfully' in output:
+            elif not restarted and saw_reconnecting and b'Connected successfully' in output:
                 restarted = True
                 os.write(master, b'q')
         if process.poll() is None:
