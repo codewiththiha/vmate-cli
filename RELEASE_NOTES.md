@@ -1,37 +1,43 @@
-# vmate-cli 1.2.3
+# vmate-cli 1.2.4
 
-## Shutdown and input responsiveness
+## Fix scans after upgrading from sudo-based versions
 
-- Prioritize q and Ctrl+C during concurrent scans and heavy OpenVPN output.
-- Handle SIGTERM and terminal hangup through bounded child-process teardown.
-- Validate teardown before retrying a connection or reporting probe success.
-- Support non-interactive connection input without requiring raw terminal mode.
+- Reuse unchanged generated configs instead of rewriting root-owned files.
+- Replace stale generated configs atomically.
+- Return generated config files and directories to the invoking user during
+  sudo runs. Refuse generated-file symlinks.
+- If stale storage is not writable, report a one-time ownership repair command.
 
-## Rootless scanning and managed connections
+## Fix OpenVPN 2.7 scans aborting on pushed options
 
-- Probe with `dev null` without configuring host tunnel interfaces or routes.
-- Reject unsupported probe configuration directives and disable scripts.
-- Preserve relay history on local setup errors; abort scans on tester errors.
-- Add `vmate-cli managed UUID` for existing Linux NetworkManager VPN profiles.
-  Authorization follows system NetworkManager/polkit policy.
+OpenVPN 2.7 can report `Options error: option dhcp-option cannot be used in this
+context ([PUSH-OPTIONS])`. Version 1.2.3 incorrectly treated server-pushed option
+diagnostics as local setup failures and aborted the entire scan. Monitoring
+now waits for the actual handshake outcome instead. Real local setup failures
+still abort safely, but retain the complete diagnostic rather than only the
+words `Options error:`.
 
-## Verified scope
+## Verification
 
-149 Rust tests passed with Linux/macOS lint and documentation checks. Linux
-public-relay tests passed q, reconnect, Ctrl+C, SIGTERM and SIGHUP teardown.
-Unprivileged scans preserved observed interfaces, routes, rules and resolver
-hash. All eight 64/500-worker local-sink stress cases passed without survivors.
-At 500 workers cleanup took 175–193 ms; child PSS was about 683–685 MiB.
-The default remains 64 workers; 500 is an explicit resource-heavy option.
+154 tests and Linux/macOS lint/docs passed. Linux CI exercised a root-owned
+277-config cache, sudo repair and a subsequent normal-user scan. An unprivileged
+OpenVPN 2.7.8 public scan completed all 277 configs with 34 successful handshakes
+and unchanged network snapshots. Existing public q/reconnect/Ctrl+C/TERM/HUP
+lifecycle tests also passed. The compatibility source build disabled DCO, LZO,
+LZ4 and PAM; this does not validate every distributor build or Internet egress.
+See docs/testing/scan-upgrade.md for provenance and limits.
 
-## Installation and limitations
+## Upgrade
 
-Choose the archive matching your OS and architecture, extract it and run its
-`install.sh`. Verify the archive using the published SHA256 checksums.
-These archives do not bundle OpenVPN; install OpenVPN separately. Raw VPN
-connections still need system privileges. Managed mode requires an existing
-NetworkManager VPN profile, plugin, credentials and suitable authorization.
+Extract your platform archive and run its install.sh. OpenVPN remains a separate
+system dependency. Scan normally without sudo. If an old cache still needs
+ownership repair, run once as your normal user:
 
-Live NetworkManager/polkit, macOS VPN teardown and Internet/DNS egress were not
-validated by the Linux lifecycle tests. SIGKILL and kernel failure cannot
-promise graceful cleanup. See docs/testing/linux-public-relays.md for evidence.
+```sh
+sudo chown -R "$(id -u):$(id -g)" "$HOME/.config/vmate-cli"
+vmate-cli scan --max 100 -t 5 --verbose
+```
+
+Use your custom XDG_CONFIG_HOME path instead if configured. The 500-worker
+request can still be reduced to fit the process file-descriptor limit; this is
+intentional, not a scan failure. The default remains 64 workers.

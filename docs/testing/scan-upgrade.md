@@ -40,3 +40,12 @@ it is not a claim of testing every distributor build or the reporting machine.
 The regression test uses the exact diagnostic. The public-relay workflow also
 builds pinned OpenVPN 2.7.8 and scans all 277 configs as nobody, requiring at
 least one handshake, full scan completion and unchanged network snapshots.
+
+## Final GitHub runner verification
+
+Code 5c9ff32 passed Linux/macOS CI run 44915489969 with 154 tests and the Linux
+sudo upgrade fixture. Public lifecycle and OpenVPN 2.7 scan run 44915489991
+passed. The 2.7 scan ran as UID 65534, completed all 277 configs with 34 successful
+handshakes and preserved links, routes, rules and resolver-file hash.
+Permanent summary: scan-upgrade-results.json. These are handshake and lifecycle
+checks, not Internet egress validation or testing on the reporting machine.
