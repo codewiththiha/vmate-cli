@@ -7,6 +7,7 @@ on:
     paths:
       - .github/workflows/live-vpngate.yml
       - tools/live_vpngate.py
+      - crates/vmate-cli/src/ui/term.rs
 
 permissions:
   contents: read

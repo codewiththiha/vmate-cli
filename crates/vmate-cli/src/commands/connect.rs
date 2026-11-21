@@ -91,11 +91,6 @@ pub async fn run(settings: &Settings, args: &ConnectArgs, verbose: &Verbosity) -
         killall_enabled: settings.killall_enabled,
     });
     let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
-    // Raw mode turns Ctrl+C into a key event, so this only catches a real
-    // signal (--no-interactive, or one delivered before the TUI came up): it
-    // kills what we spawned and restores the terminal instead of leaving both
-    // behind.
-    let _signal_guard = crate::ui::term::SignalGuard::install(registry.clone());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
         registry: registry.clone(),

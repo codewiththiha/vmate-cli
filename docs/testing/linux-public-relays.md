@@ -34,3 +34,22 @@ awaiting child reaping or graceful route removal. That competing owner needs
 consolidation before claiming graceful SIGTERM behavior. A D-state process
 cannot be guaranteed to exit by SIGKILL; record kernel and wait-channel details
 when reproducible. No release or all-edge-case guarantee is justified by this run.
+
+## Corrected terminal detection
+
+Run https://github.com/codewiththiha/vmate-cli/actions/runs/44894691962
+at commit 49ca11d used a rendered terminal screen rather than raw ANSI matching.
+Linux and macOS CI passed in run 44894691984.
+
+- Scan found the same JP/HK relay matches.
+- Interactive q passed: connected status observed, exit 0, no OpenVPN processes,
+  and route/link snapshots equal to the baseline.
+- Interactive r then q passed: reconnect and subsequent connected status
+  observed, exit 0, no OpenVPN processes, baseline routes/links restored.
+- SIGTERM failed: OpenVPN PID 2159 remained in D state and the relay host route
+  remained. This reproduced the competing emergency shutdown path.
+
+The follow-up removes CLI SignalGuard and leaves ConnectService as the signal
+owner. Cancellation awaits handle teardown and reaping; TuiGuard still restores
+the terminal on normal return. Another live rerun is required before declaring
+SIGTERM fixed. This does not claim kernel D-state immunity.

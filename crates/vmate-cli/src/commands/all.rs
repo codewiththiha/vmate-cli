@@ -59,9 +59,6 @@ pub async fn run(settings: &Settings, args: &AllArgs, verbose: &Verbosity) -> Re
     let queue = ConnectQueue::new(candidates);
 
     let registry = Arc::new(vmate_core::system::ProcessRegistry::new());
-    // Catches a real signal (raw mode turns Ctrl+C into a key event) so an
-    // interrupted session still cleans up and restores the terminal.
-    let _signal_guard = crate::ui::term::SignalGuard::install(registry.clone());
     let runner = Arc::new(RealOpenVpnRunner {
         bin: settings.openvpn_bin.clone(),
         registry: registry.clone(),

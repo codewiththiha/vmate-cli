@@ -31,36 +31,3 @@ impl Drop for TuiGuard {
         restore_terminal();
     }
 }
-
-/// Keeps an emergency shutdown handler alive for one interactive session.
-///
-/// Raw mode turns Ctrl+C into a key event, so this only sees a real signal:
-/// `--no-interactive` runs, or a SIGINT/SIGTERM that arrives before the TUI
-/// takes over. Without it such a signal would kill vmate mid-session, leaving
-/// the terminal in raw mode and the tunnel process behind.
-pub struct SignalGuard(Option<tokio::task::JoinHandle<()>>);
-
-impl SignalGuard {
-    /// Install the handler for the processes registered in `registry`.
-    pub fn install(registry: std::sync::Arc<vmate_core::system::ProcessRegistry>) -> Self {
-        let handle = tokio::spawn(async move {
-            let reason = vmate_core::system::shutdown_signal().await;
-            registry.kill_all_immediate();
-            restore_terminal();
-            // 130 is the shell convention for SIGINT, 143 for SIGTERM.
-            std::process::exit(match reason {
-                vmate_core::system::ShutdownReason::CtrlC => 130,
-                vmate_core::system::ShutdownReason::Term => 143,
-            });
-        });
-        Self(Some(handle))
-    }
-}
-
-impl Drop for SignalGuard {
-    fn drop(&mut self) {
-        if let Some(handle) = self.0.take() {
-            handle.abort();
-        }
-    }
-}
