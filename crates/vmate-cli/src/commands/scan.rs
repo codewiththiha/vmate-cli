@@ -14,16 +14,9 @@ use vmate_core::geo::IpInfoGeoLocator;
 use vmate_core::ovpn::process::{RealVpnTester, VpnTester};
 use vmate_core::scan::{ScanOptions, ScanProgress, ScanReport, ScanService};
 use vmate_core::settings::UserSettings;
-use vmate_core::system::{
-    CleanupGuard, ProcessKiller, RealProcessKiller, require_root_for, shutdown_signal,
-};
+use vmate_core::system::{CleanupGuard, ProcessKiller, RealProcessKiller};
 
 pub async fn run(settings: &Settings, args: &ScanArgs, verbose: &Verbosity) -> Result<()> {
-    // Elevate like a real run: OpenVPN requires root/CAP_NET_ADMIN to allocate
-    // the tun/tap device even for test probes, and the config dir may need
-    // sudo (e.g. left over from a previous elevated run).
-    require_root_for("run OpenVPN tests", settings.no_elevate)?;
-
     // --save-defaults persists and exits without scanning (no OpenVPN, no DB).
     if settings.save_defaults {
         persist_scan_defaults(args)?;
@@ -84,21 +77,21 @@ pub(crate) async fn scan_pipeline(
     // Ctrl+C / SIGTERM cancels the scan; the cleanup guard kills any stale
     // OpenVPN processes on the way out.
     let cancel = CancellationToken::new();
-    let cancel_task = cancel.clone();
-    let signal_task = tokio::spawn(async move {
-        let _ = shutdown_signal().await;
-        cancel_task.cancel();
-    });
+    let input = crate::ui::scan_input::ScanInput::new(cancel.clone())?;
+    let signal_task = vmate_core::system::signal::cancel_on_shutdown(cancel.clone());
     let _guard = CleanupGuard::new(killer.clone(), registry.clone(), settings.killall_enabled);
 
-    let progress: Arc<dyn ScanProgress> = if crate::app::is_verbose(verbose) {
-        Arc::new(VerboseReporter)
-    } else {
-        Arc::new(ProgressReporter::new(settings.filter.to_display()))
-    };
+    let progress = new_progress(settings, verbose);
 
-    let report = service.scan(&options, progress, cancel).await?;
-    signal_task.abort();
+    let result = service.scan(&options, progress, cancel.clone()).await;
+    drop(signal_task);
+    input.finish().await;
+    let mut report = result?;
+    if cancel.is_cancelled() {
+        report.matched_configs.clear();
+        report.matched = 0;
+        println!("Scan cancelled; disconnected all probes.");
+    }
 
     print_report(&report, settings);
 
@@ -207,6 +200,14 @@ fn materialize_builtins_into(
         vmate_core::builtin::materialize(cfg, dir)?;
     }
     Ok(configs.len())
+}
+
+fn new_progress(settings: &Settings, verbose: &Verbosity) -> Arc<dyn ScanProgress> {
+    if crate::app::is_verbose(verbose) {
+        Arc::new(VerboseReporter)
+    } else {
+        Arc::new(ProgressReporter::new(settings.filter.to_display()))
+    }
 }
 
 #[cfg(test)]

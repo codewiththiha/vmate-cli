@@ -1,0 +1,54 @@
+name: scan-resources
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/linux-session-lifecycle]
+    paths:
+      - .github/workflows/scan-resources.yml
+      - tools/scan_bench.py
+      - tools/input_latency.py
+      - tools/linux_state.py
+      - crates/vmate-core/src/ovpn/**
+      - crates/vmate-cli/src/ui/input.rs
+
+permissions:
+  contents: read
+
+jobs:
+  linux-workers:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked
+      - name: Measure 64 and 500 real OpenVPN workers
+        run: |
+          mkdir -p evidence
+          docker run --rm --privileged --memory=5g --pids-limit=2048 \
+            -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
+            ubuntu:24.04 bash -euc '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                openvpn python3 iproute2 procps ca-certificates
+              export PATH=/usr/sbin:$PATH
+              uname -a > /evidence/platform.txt
+              openvpn --version >> /evidence/platform.txt
+              mkdir /tmp/builtin
+              HOME=/tmp/builtin /workspace/target/debug/vmate-cli \
+                scan --max 8 --timeout 1ms --no-save > /evidence/materialize.log
+              template=$(find /tmp/builtin -name "*.ovpn" -print -quit)
+              python3 /workspace/tools/input_latency.py \
+                /workspace/target/debug/vmate-cli > /evidence/input-latency.json
+              python3 /workspace/tools/scan_bench.py \
+                --binary /workspace/target/debug/vmate-cli --template "$template" \
+                --output /evidence/workers --workers 64 500
+            '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-scan-resource-evidence
+          path: evidence/
+          retention-days: 7

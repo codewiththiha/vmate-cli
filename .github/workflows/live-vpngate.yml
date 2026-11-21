@@ -7,7 +7,9 @@ on:
     paths:
       - .github/workflows/live-vpngate.yml
       - tools/live_vpngate.py
-      - crates/vmate-cli/src/ui/term.rs
+      - crates/vmate-cli/src/ui/**
+      - crates/vmate-core/src/ovpn/**
+      - tools/linux_state.py
 
 permissions:
   contents: read

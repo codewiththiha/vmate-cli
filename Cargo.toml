@@ -97,7 +97,7 @@ base64 = "0.22"
 url = "2"
 
 # Unix process control
-nix = { version = "0.29", features = ["signal", "process", "user"] }
+nix = { version = "0.29", features = ["signal", "process", "user", "resource"] }
 
 # Testing
 assert_cmd = "2"

@@ -13,6 +13,7 @@ import sys
 import time
 import pyte
 from pathlib import Path
+from linux_state import network_state
 
 REPORT = Path('/evidence')
 BIN = '/workspace/target/debug/vmate-cli'
@@ -20,13 +21,8 @@ ENV = dict(os.environ, HOME='/tmp/vmate-live', TERM='xterm-256color')
 
 
 def snapshot():
-    result = {}
-    for name, command in {
-        'routes': ['ip', '-j', 'route'],
-        'links': ['ip', '-j', 'link'],
-        'processes': ['ps', '-eo', 'pid,ppid,pgid,stat,args'],
-    }.items():
-        result[name] = subprocess.check_output(command, text=True)
+    result = network_state()
+    result['processes'] = subprocess.check_output(['ps', '-eo', 'pid,ppid,pgid,stat,args'], text=True)
     return result
 
 
@@ -74,7 +70,7 @@ def session(config, action):
                 elif action == 'TERM':
                     process.send_signal(signal.SIGTERM)
                 else:
-                    os.write(master, b'q')
+                    os.write(master, b'\x03' if action == 'CTRL_C' else b'q')
             elif not restarted and saw_reconnecting and 'Connected: ' in visible:
                 restarted = True
                 os.write(master, b'q')
@@ -99,20 +95,24 @@ def main():
     results = {'before': snapshot(), 'status': 'incomplete', 'sessions': []}
     try:
         no_children()
+        scan_before = network_state()
         command = [BIN, '--db', '/tmp/live.db', 'scan', '--max', '8',
                    '--limit', '2', '--timeout', '15s', '--export', '/tmp/matches']
         with REPORT.joinpath('scan.log').open('wb') as log:
-            process = subprocess.Popen(command, env=ENV, stdout=log, stderr=log)
+            process = subprocess.Popen(command, env=ENV, stdout=log, stderr=log, user=65534, group=65534)
             try:
                 process.wait(timeout=240)
             except subprocess.TimeoutExpired:
                 process.send_signal(signal.SIGTERM)
                 process.wait(timeout=15)
         no_children()
+        results['scan_network_unchanged'] = network_state() == scan_before
+        if not results['scan_network_unchanged']:
+            raise RuntimeError('scan changed system network state')
         configs = list(Path('/tmp/matches').glob('*.ovpn'))
         if not configs:
             raise RuntimeError('INCONCLUSIVE: no built-in public relay passed scanning')
-        for action in ('q', 'r', 'TERM'):
+        for action in ('q', 'r', 'CTRL_C', 'TERM'):
             results['sessions'].append(session(configs[0], action))
         results['status'] = 'passed'
     except Exception as error:

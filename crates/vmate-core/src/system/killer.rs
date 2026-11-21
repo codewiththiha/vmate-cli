@@ -240,7 +240,15 @@ pub async fn kill_process_tree_with_grace(
     let _ = killer.kill_process_group(pid);
     if tokio::time::timeout(grace, child.wait()).await.is_err() {
         let _ = killer.force_kill_process_group(pid);
-        let _ = child.wait().await;
+        if tokio::time::timeout(KILL_GRACE, child.wait())
+            .await
+            .is_err()
+        {
+            tracing::error!(
+                pid,
+                "OpenVPN did not reap after SIGKILL; inspect kernel wait state"
+            );
+        }
     }
 }
 

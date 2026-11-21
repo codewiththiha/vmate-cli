@@ -13,12 +13,16 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
-/// Arguments used when probing whether a config connects (no routes or
-/// interfaces are actually configured).
+/// Probe handshakes without creating an interface or installing routes.
 pub fn test_args(config: &Path) -> Vec<String> {
     vec![
         "--config".to_string(),
         config.display().to_string(),
+        "--dev".to_string(),
+        "null".to_string(),
+        "--route-nopull".to_string(),
+        "--script-security".to_string(),
+        "0".to_string(),
         "--route-noexec".to_string(),
         "--ifconfig-noexec".to_string(),
         "--nobind".to_string(),
@@ -71,8 +75,10 @@ impl OpenVpnHandle {
             &mut self.child,
         )
         .await;
-        self.registry.unregister(self.pid);
-        self.pid = 0;
+        if self.child.try_wait().ok().flatten().is_some() {
+            self.registry.unregister(self.pid);
+            self.pid = 0;
+        }
     }
 
     /// Stop the process tree without waiting out the full grace period.
@@ -87,8 +93,10 @@ impl OpenVpnHandle {
             crate::system::killer::SWITCH_GRACE,
         )
         .await;
-        self.registry.unregister(self.pid);
-        self.pid = 0;
+        if self.child.try_wait().ok().flatten().is_some() {
+            self.registry.unregister(self.pid);
+            self.pid = 0;
+        }
     }
 }
 
@@ -186,6 +194,9 @@ pub struct RealOpenVpnRunner {
 
 impl OpenVpnRunner for RealOpenVpnRunner {
     fn spawn(&self, args: &[String]) -> Result<OpenVpnHandle> {
+        if let Some(config) = args.windows(2).find(|pair| pair[0] == "--config") {
+            crate::ovpn::policy::validate(Path::new(&config[1]), false)?;
+        }
         spawn_openvpn(&self.bin, args, &self.registry)
     }
 
@@ -298,6 +309,7 @@ pub async fn test_openvpn_config(
     killer: &dyn ProcessKiller,
     registry: &ProcessRegistry,
 ) -> Result<bool> {
+    crate::ovpn::policy::validate(config, true)?;
     let args = test_args(config);
     let mut handle = spawn_openvpn(bin, &args, registry)?;
 

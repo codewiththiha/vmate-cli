@@ -4,4 +4,5 @@ pub mod cipher;
 pub mod keywords;
 pub mod monitor;
 pub mod parser;
+pub mod policy;
 pub mod process;

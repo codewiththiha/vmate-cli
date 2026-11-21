@@ -51,7 +51,7 @@ impl ScanService {
         progress.total(total);
 
         let cancel = cancel.child_token();
-        let workers = options.workers.max(1);
+        let workers = super::resources::workers(options.workers);
         let semaphore = Arc::new(Semaphore::new(workers));
         let counts = Arc::new(Counts::default());
         let results: Arc<Mutex<Vec<ScanMatch>>> = Arc::new(Mutex::new(Vec::new()));
@@ -112,17 +112,8 @@ impl ScanService {
                 counts.ok.fetch_add(1, Ordering::SeqCst);
                 progress.ok();
 
-                // Geo lookup is independent of the test and must never block the
-                // whole scan on a slow HTTP call; failures degrade to UNKNOWN.
-                let lookup = match geo.country_for_config(&path).await {
-                    Ok(l) => l,
-                    Err(e) => {
-                        tracing::debug!(path = %path.display(), error = %e, "geo lookup failed");
-                        CountryLookup {
-                            country: CountryCode::unknown(),
-                            source: CountrySource::Unknown,
-                        }
-                    }
+                let Some(lookup) = lookup_country(geo.as_ref(), &path, &cancel).await else {
+                    return;
                 };
 
                 if !no_save {
@@ -195,6 +186,9 @@ fn prepare_paths(options: &ScanOptions) -> Result<Vec<PathBuf>> {
     let dir = paths::canonicalize_dir(&options.dir)
         .with_context(|| format!("scan directory does not exist: {}", options.dir.display()))?;
     let paths = discover_configs(&dir)?;
+    for path in &paths {
+        crate::ovpn::policy::validate(path, true)?;
+    }
     if options.modify {
         for path in &paths {
             if options.backup {
@@ -208,4 +202,23 @@ fn prepare_paths(options: &ScanOptions) -> Result<Vec<PathBuf>> {
         }
     }
     Ok(paths)
+}
+
+async fn lookup_country(
+    geo: &dyn GeoLocator,
+    path: &Path,
+    cancel: &CancellationToken,
+) -> Option<CountryLookup> {
+    let result = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => return None,
+        result = tokio::time::timeout(std::time::Duration::from_secs(5), geo.country_for_config(path)) => result,
+    };
+    match result {
+        Ok(Ok(lookup)) => Some(lookup),
+        _ => Some(CountryLookup {
+            country: CountryCode::unknown(),
+            source: CountrySource::Unknown,
+        }),
+    }
 }

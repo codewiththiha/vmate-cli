@@ -5,10 +5,11 @@
 //! at column 0. `Ctrl+C` quits (in raw mode it arrives as a control-modified
 //! `c`, not SIGINT).
 
+use crate::ui::input::InputReader;
 use crate::ui::term::TuiGuard;
 use anyhow::Result;
 use async_trait::async_trait;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event;
 use crossterm::execute;
 use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::Terminal;
@@ -31,7 +32,7 @@ const MESSAGE_TTL: Duration = Duration::from_secs(3);
 /// How long `poll_command` blocks waiting for a key before re-rendering and
 /// yielding to the runtime. Short enough that `n`/`q`/Ctrl+C feel instant,
 /// long enough to keep redraws (and CPU) cheap.
-const KEY_POLL: Duration = Duration::from_millis(50);
+const KEY_POLL: Duration = Duration::from_millis(100);
 
 /// Whether a transient overlay came from the connect status (the fading
 /// "Connected successfully to X" confirmation) or from a user-facing notice
@@ -60,7 +61,8 @@ pub struct ConnectTui {
     connected_since: Option<Instant>,
     transient: Option<Transient>,
     verbose: bool,
-    no_interactive: bool,
+    input: InputReader,
+    tick: tokio::time::Interval,
     filter: String,
     status: ConnectionStatus,
     log: VecDeque<String>,
@@ -84,7 +86,8 @@ impl ConnectTui {
             connected_since: None,
             transient: None,
             verbose,
-            no_interactive,
+            input: InputReader::new(!no_interactive)?,
+            tick: tokio::time::interval(KEY_POLL),
             filter,
             status: ConnectionStatus {
                 connected: false,
@@ -217,42 +220,6 @@ impl ConnectTui {
         })?;
         Ok(())
     }
-
-    fn read_key(&mut self) -> Option<UserCommand> {
-        if self.no_interactive {
-            return None;
-        }
-        // Short poll: the connect loop redraws (and so updates the uptime
-        // clock) on every call, and a keypress must be picked up straight
-        // away instead of waiting out a long block.
-        if !event::poll(Duration::ZERO).ok()? {
-            return None;
-        }
-        match event::read().ok()? {
-            Event::Key(k) if k.kind == KeyEventKind::Press => {
-                // Ctrl+C quits (raw mode swallows SIGINT, so an interactive
-                // Ctrl+C can only ever be seen here).
-                if k.modifiers.contains(KeyModifiers::CONTROL)
-                    && matches!(k.code, KeyCode::Char('c') | KeyCode::Char('C'))
-                {
-                    return Some(UserCommand::Quit);
-                }
-                match k.code {
-                    KeyCode::Char('n') => Some(UserCommand::Next),
-                    KeyCode::Char('r') => Some(UserCommand::Reconnect),
-                    KeyCode::Char('v') => {
-                        self.verbose = !self.verbose;
-                        Some(UserCommand::ToggleVerbose)
-                    }
-                    KeyCode::Char('?') => Some(UserCommand::Help),
-                    KeyCode::Char('q') | KeyCode::Esc => Some(UserCommand::Quit),
-                    KeyCode::Char('c') => Some(UserCommand::CopyPath),
-                    _ => None,
-                }
-            }
-            _ => None,
-        }
-    }
 }
 
 #[async_trait]
@@ -313,7 +280,7 @@ impl ConnectHost for ConnectTui {
         if self.log.len() > 200 {
             self.log.pop_front();
         }
-        self.draw()
+        Ok(())
     }
 
     async fn copy(&mut self, text: &str) -> Result<()> {
@@ -330,9 +297,19 @@ impl ConnectHost for ConnectTui {
     }
 
     async fn poll_command(&mut self) -> Option<UserCommand> {
-        tokio::time::sleep(KEY_POLL).await;
-        let _ = self.draw();
-        self.read_key()
+        tokio::select! {
+            biased;
+            command = self.input.next() => {
+                if command == Some(UserCommand::ToggleVerbose) {
+                    self.verbose = !self.verbose;
+                }
+                command
+            }
+            _ = self.tick.tick() => {
+                let _ = self.draw();
+                None
+            }
+        }
     }
 
     async fn finish(&mut self) -> Result<()> {

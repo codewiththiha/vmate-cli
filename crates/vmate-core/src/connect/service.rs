@@ -96,18 +96,10 @@ impl ConnectService {
     pub async fn run(&self, mut queue: ConnectQueue, host: &mut dyn ConnectHost) -> Result<()> {
         let cancel = CancellationToken::new();
 
-        // Ctrl+C / SIGTERM must break the loop even when the TUI cannot turn
-        // them into key events: raw mode swallows SIGINT, so with
-        // `--no-interactive` (or a signal that lands before the UI is up) this
-        // is the only way out that is not "wait for the current handshake".
-        let cancel_task = cancel.clone();
-        let signal_task = tokio::spawn(async move {
-            let _ = crate::system::shutdown_signal().await;
-            cancel_task.cancel();
-        });
+        let signal_task = crate::system::signal::cancel_on_shutdown(cancel.clone());
 
         let result = self.run_queue(&mut queue, host, &cancel).await;
-        signal_task.abort();
+        drop(signal_task);
         result
     }
 
@@ -212,14 +204,8 @@ impl ConnectService {
                         let exit = self
                             .monitor_connected(&candidate, &mut handle, host, cancel)
                             .await?;
-                        // A switch or a quit escalates immediately; a crash or
-                        // a timeout keeps the graceful teardown.
-                        match exit {
-                            Phase2Exit::Quit | Phase2Exit::Next => {
-                                handle.kill_now(self.killer.as_ref()).await; // targeted kill only
-                            }
-                            _ => handle.kill_graceful(self.killer.as_ref()).await,
-                        }
+                        let _ = host.notify("Disconnecting OpenVPN...").await;
+                        handle.kill_graceful(self.killer.as_ref()).await;
                         match exit {
                             Phase2Exit::Quit => {
                                 host.finish().await?;

@@ -82,6 +82,12 @@ pub enum Command {
     /// Export successful configs.
     Export(ExportArgs),
 
+    /// Run an existing Linux NetworkManager VPN without elevating vmate.
+    Managed {
+        /// Existing VPN profile UUID; list with nmcli connection show.
+        uuid: String,
+    },
+
     /// Check dependencies and environment.
     Doctor,
 

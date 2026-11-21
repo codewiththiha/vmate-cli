@@ -33,3 +33,20 @@ pub async fn shutdown_signal() -> ShutdownReason {
         ShutdownReason::CtrlC
     }
 }
+
+/// Own a shutdown listener until the surrounding operation ends.
+pub struct ShutdownTask(tokio::task::JoinHandle<()>);
+
+impl Drop for ShutdownTask {
+    fn drop(&mut self) {
+        self.0.abort();
+    }
+}
+
+/// Cancel an operation on SIGINT or SIGTERM without bypassing its teardown.
+pub fn cancel_on_shutdown(cancel: tokio_util::sync::CancellationToken) -> ShutdownTask {
+    ShutdownTask(tokio::spawn(async move {
+        let _ = shutdown_signal().await;
+        cancel.cancel();
+    }))
+}

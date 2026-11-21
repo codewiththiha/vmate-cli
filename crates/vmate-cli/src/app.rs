@@ -19,6 +19,7 @@ pub async fn run(cli: Cli) -> Result<()> {
         Command::Recent(args) => crate::commands::recent::run(&settings, args).await,
         Command::All(args) => crate::commands::all::run(&settings, args, &cli.verbose).await,
         Command::Export(args) => crate::commands::export::run(&settings, args).await,
+        Command::Managed { uuid } => crate::commands::managed::run(uuid).await,
         Command::Doctor => crate::commands::doctor::run(&settings).await,
         Command::Completions(args) => crate::commands::completions::run(args.shell, args.print),
     }

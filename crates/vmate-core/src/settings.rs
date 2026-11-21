@@ -114,11 +114,11 @@ impl UserSettings {
             .unwrap_or(Duration::from_secs(15))
     }
 
-    /// Resolve the connect `--connect-timeout` value: explicit OR persisted OR 5s.
+    /// Resolve the connect `--connect-timeout` value: explicit OR persisted OR 15s.
     pub fn connect_timeout(&self, explicit: Option<Duration>) -> Duration {
         explicit
             .or(self.connect_timeout_secs.map(Duration::from_secs))
-            .unwrap_or(Duration::from_secs(5))
+            .unwrap_or(Duration::from_secs(15))
     }
 
     /// Resolve the connect `--cooldown` value: explicit OR persisted OR 30s.
@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(us.max_workers(None), 64);
         assert_eq!(us.limit(None), 100);
         assert_eq!(us.scan_timeout(None), s(15));
-        assert_eq!(us.connect_timeout(None), s(5));
+        assert_eq!(us.connect_timeout(None), s(15));
         assert_eq!(us.cooldown(None), s(30));
         assert_eq!(us.retry_count(None), 2);
         assert_eq!(us.stability_grace(None), s(5));
