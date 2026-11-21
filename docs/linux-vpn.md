@@ -49,8 +49,9 @@ DNS, or traffic. Never publish private keys or auth-user-pass contents.
 - Hard kill cannot guarantee OS route/DNS rollback. Normal teardown remains
   graceful; abnormal-drop cleanup is only a process-liveness safety net.
 - DNS integration is not provided merely by opening a TUN device.
-- Local permission/route errors can still consume the per-config retry budget.
-  Classifying systemic versus relay failures needs a dedicated outcome model.
+- Local setup/permission/descriptor errors now have a separate outcome and
+  abort without deleting relay history. Missing-binary scan errors also abort.
+  Unknown log signatures can still be classified as generic remote failures.
 - Dropping after persistent failures is existing behavior, not evidence that a
   relay permanently died. Preserve exports before diagnostic experiments.
 

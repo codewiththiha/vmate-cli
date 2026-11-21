@@ -50,3 +50,8 @@ Piped/noninteractive connect uses a console host, not a raw terminal.
 Linux managed mode delegates an existing VPN profile to NetworkManager. It is
 an explicit alternative, not an automatic backend switch or a newly installed
 root daemon. See docs/privileges.md for authorization and crash limitations.
+
+Local setup errors have a distinct monitor outcome. They abort raw connection
+attempts without consuming relay retry budgets. Probe tester errors cancel the
+scan, join workers and return an error rather than recording remote failures.
+Teardown is checked before a successful probe or another tunnel is allowed.

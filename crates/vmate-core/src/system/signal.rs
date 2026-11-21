@@ -49,7 +49,7 @@ impl Drop for ShutdownTask {
     }
 }
 
-/// Cancel an operation on SIGINT or SIGTERM without bypassing its teardown.
+/// Cancel on SIGINT, SIGTERM or SIGHUP without bypassing operation teardown.
 pub fn cancel_on_shutdown(cancel: tokio_util::sync::CancellationToken) -> ShutdownTask {
     ShutdownTask(tokio::spawn(async move {
         let _ = shutdown_signal().await;

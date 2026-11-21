@@ -433,8 +433,8 @@ body; see AGENTS.md. Run `python3 tools/shape_check.py --dups` before pushing.
 ### Isolated scanning and service-managed connections
 
 Scans now use OpenVPN `dev null`, suppressed routes, and disabled external
-scripts. They test handshakes, not system VPN routing or Internet traffic. q,
-Ctrl+C, SIGTERM and terminal hangup cancel probes and await their teardown. Scanning still uses
+scripts. They test handshakes, not system VPN routing or Internet traffic.
+Interactive q, Ctrl+C, SIGTERM and terminal hangup cancel probes and await teardown. Scanning still uses
 bandwidth, CPU and DNS: reduce `--max` if the network becomes slow.
 
 ```sh

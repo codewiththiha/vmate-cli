@@ -82,3 +82,14 @@ similar flooded-output latencies. Raw transcript rendering is rate-limited to
 A follow-up real 64-worker local SIGHUP test exited in 46 ms with no child PIDs
 or network-state changes. Later CI includes hangup and mocked managed teardown;
 keep its results distinct from the six-run measurement table above.
+
+Latest input-owner rerun: 4f6ef20, run 44898514503. All eight 64/500-worker q,
+Ctrl+C, SIGTERM and SIGHUP cases passed with unchanged network state and no child
+PIDs. At 500 workers teardown took 196–223 ms. The raw-output flood and mocked
+NetworkManager cases exited in 15–32 ms. Summary: docs/testing/scan-hangup-results.json.
+
+Final teardown/error-classification run: 2a4c36e, run 44899043086. All eight cases
+passed. At 500 workers, child PSS samples were 683.4–685.4 MiB and teardown took
+175–193 ms. The persisted scan-hangup-results.json now identifies this final run.
+This still measures a local stalled-handshake workload, not 500 full public TLS
+sessions. No evidence justifies increasing the universal default to 500.

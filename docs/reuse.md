@@ -36,3 +36,8 @@ feature test modules until there are two real cross-feature callers.
   public-relay and local high-worker test harnesses.
 - `crates/vmate-cli/src/commands/managed.rs`: explicit existing-profile
   NetworkManager ownership; it does not introduce another privileged daemon.
+
+- `crates/vmate-core/src/ovpn/monitor.rs::local_failure`: shared local-error
+  recognition for probes, handshakes and established sessions.
+- `crates/vmate-core/src/ovpn/process.rs::OpenVpnHandle::ensure_stopped`:
+  post-teardown invariant checked before success or another connection attempt.
