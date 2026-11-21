@@ -9,6 +9,7 @@
 
 # Agent / assistant documentation (not distributed)
 CLAUDE.md
-AGENTS.md
 docs.md
 .claude/
+
+__pycache__/

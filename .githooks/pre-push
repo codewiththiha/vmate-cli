@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+python3 tools/shape_check.py --dups
+cargo fmt --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --locked

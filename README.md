@@ -418,3 +418,13 @@ Design principles:
 ## License
 
 [MIT](LICENSE)
+
+## Contributor and troubleshooting guides
+
+- [Agent contract](AGENTS.md) and [architecture](docs/architecture.md)
+- [Reuse index](docs/reuse.md) and [resource measurements](docs/memory.md)
+- [Linux scan/connect investigation and bundling](docs/linux-vpn.md)
+
+Enable local checks with `git config core.hooksPath .githooks` (Python 3.11+).
+Commit subjects are limited to 50 characters. Large commits need a structured
+body; see AGENTS.md. Run `python3 tools/shape_check.py --dups` before pushing.

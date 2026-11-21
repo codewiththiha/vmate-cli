@@ -32,6 +32,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Shape and duplication
+        run: python3 tools/shape_check.py --dups
+
+      - name: Commit policy
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 tools/commit_check.py --range "$BASE_SHA..$HEAD_SHA"
 
       - uses: dtolnay/rust-toolchain@stable
         with:
