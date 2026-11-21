@@ -46,26 +46,11 @@ impl ScanService {
         progress: Arc<dyn ScanProgress>,
         cancel: CancellationToken,
     ) -> Result<ScanReport> {
-        let dir = paths::canonicalize_dir(&options.dir)
-            .with_context(|| format!("scan directory does not exist: {}", options.dir.display()))?;
-
-        let paths = discover_configs(&dir)?;
+        let paths = prepare_paths(options)?;
         let total = paths.len();
         progress.total(total);
 
-        if options.modify {
-            for p in &paths {
-                if options.backup {
-                    if let Err(e) = std::fs::copy(p, backup_path(p)) {
-                        tracing::warn!(path = %p.display(), error = %e, "backup failed");
-                    }
-                }
-                if let Err(e) = modify_config_cipher(p) {
-                    tracing::warn!(path = %p.display(), error = %e, "cipher modification failed");
-                }
-            }
-        }
-
+        let cancel = cancel.child_token();
         let workers = options.workers.max(1);
         let semaphore = Arc::new(Semaphore::new(workers));
         let counts = Arc::new(Counts::default());
@@ -76,9 +61,12 @@ impl ScanService {
             if cancel.is_cancelled() {
                 break;
             }
-            let permit = match semaphore.clone().acquire_owned().await {
-                Ok(p) => p,
-                Err(_) => break,
+            while let Some(joined) = join_set.try_join_next() {
+                joined.context("scan worker panicked")?;
+            }
+            let permit = tokio::select! {
+                _ = cancel.cancelled() => break,
+                permit = semaphore.clone().acquire_owned() => permit?,
             };
 
             let tester = self.tester.clone();
@@ -111,6 +99,9 @@ impl ScanService {
                 progress.tested();
 
                 if !ok {
+                    if cancel.is_cancelled() {
+                        return;
+                    }
                     progress.failed(&path);
                     if !no_save {
                         let _ = repo.record_failure(&path, "connection test failed").await;
@@ -198,4 +189,23 @@ fn backup_path(p: &Path) -> PathBuf {
     let mut s = p.as_os_str().to_os_string();
     s.push(".bak");
     PathBuf::from(s)
+}
+
+fn prepare_paths(options: &ScanOptions) -> Result<Vec<PathBuf>> {
+    let dir = paths::canonicalize_dir(&options.dir)
+        .with_context(|| format!("scan directory does not exist: {}", options.dir.display()))?;
+    let paths = discover_configs(&dir)?;
+    if options.modify {
+        for path in &paths {
+            if options.backup {
+                if let Err(error) = std::fs::copy(path, backup_path(path)) {
+                    tracing::warn!(path = %path.display(), %error, "backup failed");
+                }
+            }
+            if let Err(error) = modify_config_cipher(path) {
+                tracing::warn!(path = %path.display(), %error, "cipher modification failed");
+            }
+        }
+    }
+    Ok(paths)
 }

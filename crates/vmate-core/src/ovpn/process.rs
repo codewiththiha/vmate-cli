@@ -55,6 +55,9 @@ pub struct OpenVpnHandle {
     pub child: tokio::process::Child,
     /// Lines from stdout and stderr, merged in arrival order.
     pub lines: mpsc::Receiver<String>,
+    registry: ProcessRegistry,
+    pid: u32,
+    readers: Vec<tokio::task::JoinHandle<()>>,
 }
 
 impl OpenVpnHandle {
@@ -68,6 +71,8 @@ impl OpenVpnHandle {
             &mut self.child,
         )
         .await;
+        self.registry.unregister(self.pid);
+        self.pid = 0;
     }
 
     /// Stop the process tree without waiting out the full grace period.
@@ -82,6 +87,18 @@ impl OpenVpnHandle {
             crate::system::killer::SWITCH_GRACE,
         )
         .await;
+        self.registry.unregister(self.pid);
+        self.pid = 0;
+    }
+}
+
+impl Drop for OpenVpnHandle {
+    fn drop(&mut self) {
+        for reader in &self.readers {
+            reader.abort();
+        }
+        let _ = crate::system::killer::force_kill_process_group(self.pid);
+        self.registry.unregister(self.pid);
     }
 }
 
@@ -96,6 +113,8 @@ pub fn spawn_openvpn(
 ) -> Result<OpenVpnHandle> {
     let mut cmd = tokio::process::Command::new(bin);
     cmd.args(args);
+    cmd.kill_on_drop(true);
+    cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
 
@@ -125,7 +144,7 @@ pub fn spawn_openvpn(
     let (tx, rx) = mpsc::channel(512);
     let stderr_tx = tx.clone();
 
-    tokio::spawn(async move {
+    let stdout_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stdout).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             if tx.send(line).await.is_err() {
@@ -134,7 +153,7 @@ pub fn spawn_openvpn(
         }
     });
 
-    tokio::spawn(async move {
+    let stderr_task = tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             if stderr_tx.send(line).await.is_err() {
@@ -143,7 +162,14 @@ pub fn spawn_openvpn(
         }
     });
 
-    Ok(OpenVpnHandle { child, lines: rx })
+    let pid = child.id().unwrap_or(0);
+    Ok(OpenVpnHandle {
+        child,
+        lines: rx,
+        registry: registry.clone(),
+        readers: vec![stdout_task, stderr_task],
+        pid,
+    })
 }
 
 /// Abstraction over spawning the OpenVPN binary.
@@ -361,3 +387,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "process/tests.rs"]
+mod lifecycle_tests;

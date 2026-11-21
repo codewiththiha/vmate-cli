@@ -34,9 +34,9 @@ const REAP_POLL: Duration = Duration::from_millis(25);
 /// Owned per run — and per test — so concurrent sessions never interfere:
 /// each [`CleanupGuard`] sweeps only the registry it was given, never another
 /// session's (or test's) live processes.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct ProcessRegistry {
-    pids: Mutex<Vec<u32>>,
+    pids: Arc<Mutex<Vec<u32>>>,
 }
 
 impl ProcessRegistry {
@@ -54,6 +54,14 @@ impl ProcessRegistry {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .push(pid);
+    }
+
+    /// Forget a reaped process before its PID can be reused.
+    pub fn unregister(&self, pid: u32) {
+        self.pids
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .retain(|p| *p != pid);
     }
 
     /// Snapshot of the currently registered pids.
@@ -270,8 +278,8 @@ impl CleanupGuard {
 
 impl Drop for CleanupGuard {
     fn drop(&mut self) {
+        self.registry.kill_all_graceful();
         if self.enabled {
-            self.registry.kill_all_graceful();
             let _ = self.killer.killall_openvpn();
         }
     }

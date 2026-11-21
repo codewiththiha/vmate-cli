@@ -225,7 +225,7 @@ impl ConnectTui {
         // Short poll: the connect loop redraws (and so updates the uptime
         // clock) on every call, and a keypress must be picked up straight
         // away instead of waiting out a long block.
-        if !event::poll(KEY_POLL).ok()? {
+        if !event::poll(Duration::ZERO).ok()? {
             return None;
         }
         match event::read().ok()? {
@@ -330,6 +330,7 @@ impl ConnectHost for ConnectTui {
     }
 
     async fn poll_command(&mut self) -> Option<UserCommand> {
+        tokio::time::sleep(KEY_POLL).await;
         let _ = self.draw();
         self.read_key()
     }
