@@ -11,6 +11,7 @@ import signal
 import subprocess
 import sys
 import time
+import pyte
 from pathlib import Path
 
 REPORT = Path('/evidence')
@@ -43,6 +44,8 @@ def session(config, action):
     process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, env=ENV)
     os.close(slave)
     output = bytearray()
+    screen = pyte.Screen(120, 40)
+    stream = pyte.Stream(screen)
     connected = False
     restarted = action != 'r'
     saw_reconnecting = False
@@ -56,21 +59,23 @@ def session(config, action):
             except OSError:
                 break
             output.extend(data)
-            if connected and action == 'r' and b'Reconnecting to' in output:
+            stream.feed(data.decode("utf-8", errors="replace"))
+            visible = "\n".join(screen.display)
+            if connected and action == 'r' and 'Reconnecting to' in visible:
                 saw_reconnecting = True
-                output.clear()
-            if b'Connected successfully' not in output:
+                screen.reset()
+            if 'Connected: ' not in visible:
                 continue
             if not connected:
                 connected = True
                 if action == 'r':
                     os.write(master, b'r')
-                    output.clear()
+                    screen.reset()
                 elif action == 'TERM':
                     process.send_signal(signal.SIGTERM)
                 else:
                     os.write(master, b'q')
-            elif not restarted and saw_reconnecting and b'Connected successfully' in output:
+            elif not restarted and saw_reconnecting and 'Connected: ' in visible:
                 restarted = True
                 os.write(master, b'q')
         if process.poll() is None:

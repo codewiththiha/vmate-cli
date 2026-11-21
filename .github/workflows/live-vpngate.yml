@@ -30,7 +30,7 @@ jobs:
             ubuntu:24.04 bash -euc '
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y \
-                openvpn python3 iproute2 procps ca-certificates
+                openvpn python3 python3-pyte iproute2 procps ca-certificates
               uname -a > /evidence/platform.txt
               openvpn --version >> /evidence/platform.txt
               python3 /workspace/tools/live_vpngate.py
