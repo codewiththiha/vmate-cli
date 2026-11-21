@@ -1,0 +1,44 @@
+name: live-vpngate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/linux-session-lifecycle]
+    paths:
+      - .github/workflows/live-vpngate.yml
+      - tools/live_vpngate.py
+
+permissions:
+  contents: read
+
+jobs:
+  linux-public-relays:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build --locked
+      - name: Test built-in relays in disposable network
+        run: |
+          mkdir -p evidence
+          docker run --rm --privileged \
+            --device /dev/net/tun \
+            -v "$PWD:/workspace:ro" -v "$PWD/evidence:/evidence" \
+            ubuntu:24.04 bash -euc '
+              apt-get update
+              DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                openvpn python3 iproute2 procps ca-certificates
+              uname -a > /evidence/platform.txt
+              openvpn --version >> /evidence/platform.txt
+              python3 /workspace/tools/live_vpngate.py
+            '
+      - name: Preserve evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-public-vpngate-evidence
+          path: evidence/
+          retention-days: 7

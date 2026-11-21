@@ -83,3 +83,31 @@ project, not a drop-in removal of the dependency. No binary is bundled here.
   Documents task result retention and cancellation on drop.
 - https://www.gnu.org/licenses/gpl-faq.html
   Distribution/licensing guidance; not a substitute for legal review.
+
+## Public relay runner test
+
+`.github/workflows/live-vpngate.yml` runs only on manual dispatch or changes to
+its harness on the investigation branch. A privileged disposable Ubuntu Docker
+network protects the runner's routes. It uses the hardcoded built-in endpoints,
+not a replacement server. It records platform/version, scan output, terminal
+sessions and process/link/route snapshots as a seven-day Actions artifact.
+
+The bounded test attempts scan, interactive q, interactive reconnect r, and
+SIGTERM. No available relay is inconclusive and produces a failing job, never a
+false green. It does not prove Internet egress, DNS correctness, all edge cases,
+macOS behavior, machine-reboot recovery, or cleanup after SIGKILL. Container
+teardown is the final safety net, not evidence that application cleanup passed.
+Review evidence before claiming successful live validation.
+
+## Sudo consent across runs
+
+Both plain and privately bundled OpenVPN need the same privileges. vmate already
+elevates once at startup for a scan/connect/all session. Multiple connection
+attempts in that elevated session do not independently prompt. Subsequent runs
+follow the host sudo timestamp policy; `sudo -v` can refresh that temporary cache.
+
+Remembering consent forever needs an installed privileged service or an explicit
+sudoers policy. Do not grant NOPASSWD to a user-writable vmate executable or a
+root command accepting arbitrary VPN configs: that can allow root code execution
+through scripts/plugins. A future broker must validate fixed operations, own its
+binary/configs as root and authenticate IPC. No persistent grant is installed.
