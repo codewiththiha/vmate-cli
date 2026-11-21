@@ -173,3 +173,5 @@ fn display_name_is_host_port_stem() {
     );
     assert_eq!(display_name(Path::new("/tmp/foo.ovpn")), None);
 }
+
+mod storage;

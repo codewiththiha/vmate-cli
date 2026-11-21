@@ -12,7 +12,7 @@ name: ci
 
 on:
   push:
-    branches: [main, fix/linux-session-lifecycle]
+    branches: [main, fix/linux-session-lifecycle, fix/scan-upgrade-compatibility]
   pull_request:
 
 permissions:
@@ -71,3 +71,9 @@ jobs:
 
       - name: Test
         run: cargo test --workspace --locked
+
+      - name: Linux sudo cache upgrade
+        if: runner.os == 'Linux'
+        run: |
+          cargo build --locked
+          python3 tools/scan_upgrade.py target/debug/vmate-cli

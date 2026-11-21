@@ -37,7 +37,10 @@ pub fn classify_line(line: &str) -> VpnLineClass {
 }
 
 /// Identify local setup failures that must not consume a relay retry budget.
-pub fn local_failure(line: &str) -> Option<&'static str> {
+pub fn local_failure(line: &str) -> Option<&str> {
+    if line.contains("[PUSH-OPTIONS]") {
+        return None;
+    }
     [
         "Options error:",
         "Cannot open TUN/TAP dev",
@@ -49,6 +52,7 @@ pub fn local_failure(line: &str) -> Option<&'static str> {
     ]
     .into_iter()
     .find(|keyword| line.contains(keyword))
+    .map(|_| line)
 }
 
 #[cfg(test)]

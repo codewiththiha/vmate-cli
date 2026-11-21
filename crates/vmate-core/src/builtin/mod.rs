@@ -15,7 +15,6 @@
 use std::fmt;
 use std::path::Path;
 
-
 use crate::paths;
 
 /// OpenVPN transport protocol.

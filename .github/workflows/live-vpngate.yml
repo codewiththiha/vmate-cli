@@ -3,7 +3,7 @@ name: live-vpngate
 on:
   workflow_dispatch:
   push:
-    branches: [fix/linux-session-lifecycle]
+    branches: [fix/linux-session-lifecycle, fix/scan-upgrade-compatibility]
     paths:
       - .github/workflows/live-vpngate.yml
       - tools/live_vpngate.py

@@ -48,3 +48,27 @@ async fn guard_cleans_targeted_children_without_killall() {
         .unwrap();
     assert!(registry.registered().is_empty());
 }
+
+#[tokio::test]
+async fn pushed_options_warning_does_not_abort_a_successful_probe() {
+    let (tx, mut rx) = mpsc::channel(4);
+    tx.send(
+        "Options error: Unrecognized option in [PUSH-OPTIONS]: block-outside-dns (2.6.14)".into(),
+    )
+    .await
+    .unwrap();
+    tx.send("Initialization Sequence Completed".into())
+        .await
+        .unwrap();
+    let outcome = monitor_test(&mut rx, Duration::from_secs(1), CancellationToken::new()).await;
+    assert_eq!(outcome, MonitorOutcome::Success);
+}
+
+#[tokio::test]
+async fn startup_options_error_keeps_diagnostic_details() {
+    let (tx, mut rx) = mpsc::channel(1);
+    let diagnostic = "Options error: Unrecognized option in config.ovpn:4: data-ciphers (2.4.12)";
+    tx.send(diagnostic.into()).await.unwrap();
+    let outcome = monitor_test(&mut rx, Duration::from_secs(1), CancellationToken::new()).await;
+    assert_eq!(outcome, MonitorOutcome::LocalError(diagnostic.into()));
+}

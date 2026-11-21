@@ -41,3 +41,8 @@ feature test modules until there are two real cross-feature callers.
   recognition for probes, handshakes and established sessions.
 - `crates/vmate-core/src/ovpn/process.rs::OpenVpnHandle::ensure_stopped`:
   post-teardown invariant checked before success or another connection attempt.
+
+- `builtin/storage.rs::materialize`: reuse identical generated configs and
+  atomically replace stale ones, repairing sudo ownership inside builtin storage.
+- `tools/scan_upgrade.py`: Linux upgrade fixture for root-owned generated caches,
+  failed stale-cache writes, sudo repair and subsequent normal-user scans.
