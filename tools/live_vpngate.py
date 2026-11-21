@@ -36,21 +36,27 @@ def no_children():
         raise RuntimeError(f'OpenVPN processes survived: {result.stdout}')
 
 
-def session(config, action):
+def vpn_pids():
+    result = subprocess.run(['pgrep', '-x', 'openvpn'], capture_output=True, text=True)
+    return set(result.stdout.split())
+
+
+def session(config, action, expires):
     before = network_state()
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-    command = [BIN, '--db', '/tmp/live.db', 'connect', str(config),
+    database = f'/tmp/session-{action}-{config.stem}.db'
+    command = [BIN, '--db', database, 'connect', str(config),
                '--connect-timeout', '25s', '--retry-count', '1']
     process = subprocess.Popen(command, stdin=slave, stdout=slave, stderr=slave, env=ENV)
     os.close(slave)
     output = bytearray()
     screen = pyte.Screen(120, 40)
     stream = pyte.Stream(screen)
-    connected = False
-    restarted = action != 'r'
-    saw_reconnecting = False
-    deadline = time.monotonic() + 100
+    connected, restarted = False, action != 'r'
+    original_pids, new_pids = set(), set()
+    generation_seen_at = None
+    deadline = min(time.monotonic() + 70, expires)
     try:
         while time.monotonic() < deadline and process.poll() is None:
             if not select.select([master], [], [], 0.5)[0]:
@@ -61,24 +67,23 @@ def session(config, action):
                 break
             output.extend(data)
             stream.feed(data.decode("utf-8", errors="replace"))
-            visible = "\n".join(screen.display)
-            if connected and action == 'r' and 'Reconnecting to' in visible:
-                saw_reconnecting = True
-                screen.reset()
-            if 'Connected: ' not in visible:
-                continue
-            if not connected:
+            up = screen.display[0].strip().startswith('Connected:')
+            if connected and action == 'r' and not restarted:
+                current = vpn_pids()
+                if current and current.isdisjoint(original_pids):
+                    new_pids = current
+                    if generation_seen_at is None:
+                        generation_seen_at = time.monotonic()
+                    elif up and time.monotonic() - generation_seen_at >= 0.2:
+                        restarted = True
+                        os.write(master, b'q')
+            elif up and not connected:
                 connected = True
-                if action == 'r':
-                    os.write(master, b'r')
-                    screen.reset()
-                elif action in ('TERM', 'HUP'):
+                original_pids = vpn_pids()
+                if action in ('TERM', 'HUP'):
                     process.send_signal(signal.SIGHUP if action == 'HUP' else signal.SIGTERM)
                 else:
-                    os.write(master, b'\x03' if action == 'CTRL_C' else b'q')
-            elif not restarted and saw_reconnecting and 'Connected: ' in visible:
-                restarted = True
-                os.write(master, b'q')
+                    os.write(master, {'r': b'r', 'CTRL_C': b'\x03'}.get(action, b'q'))
         if process.poll() is None:
             process.send_signal(signal.SIGTERM)
         process.wait(timeout=10)
@@ -88,9 +93,10 @@ def session(config, action):
         if not connected or not restarted:
             raise RelayUnavailable(f'{action}: public relay did not complete required handshake(s)')
         return {'action': action, 'connected': connected, 'restarted': restarted,
+                'original_pids': sorted(original_pids), 'new_pids': sorted(new_pids),
                 'exit_code': process.returncode, 'after': snapshot()}
     finally:
-        REPORT.joinpath(f'session-{action}.log').write_bytes(output)
+        REPORT.joinpath(f'session-{action}-{config.stem}.log').write_bytes(output)
         if process.poll() is None:
             process.kill()
             process.wait()
@@ -119,10 +125,13 @@ def main():
         configs = sorted(Path('/tmp/matches').glob('*.ovpn'), key=lambda path: ('_JP' not in path.name, path.name))
         if not configs:
             raise RuntimeError('INCONCLUSIVE: no built-in public relay passed scanning')
+        expires = time.monotonic() + 480
         for action in ('q', 'r', 'CTRL_C', 'TERM', 'HUP'):
             for config in configs[:3]:
+                if time.monotonic() >= expires:
+                    raise RelayUnavailable('live test budget expired')
                 try:
-                    results['sessions'].append(session(config, action))
+                    results['sessions'].append(session(config, action, expires))
                     break
                 except RelayUnavailable as error:
                     results.setdefault('unavailable_relays', []).append(str(error))
