@@ -53,3 +53,24 @@ The follow-up removes CLI SignalGuard and leaves ConnectService as the signal
 owner. Cancellation awaits handle teardown and reaping; TuiGuard still restores
 the terminal on normal return. Another live rerun is required before declaring
 SIGTERM fixed. This does not claim kernel D-state immunity.
+
+## Shutdown-owner fix: passed live rerun
+
+Commit 9d970a5:
+
+- Live Linux: https://github.com/codewiththiha/vmate-cli/actions/runs/44894924350
+- Linux/macOS CI: https://github.com/codewiththiha/vmate-cli/actions/runs/44894924339
+- Both workflows completed successfully.
+- Linux 7.0.0-1017-azure; Ubuntu 24.04 container; OpenVPN 2.6.19.
+- Built-in UDP scan found two passing relays.
+- q, r followed by q, and SIGTERM each observed a connected session, exited 0,
+  and passed the no-surviving-OpenVPN check.
+- Each session's final route and interface snapshots exactly matched baseline
+  when reviewed after artifact download.
+- Persistent machine-readable evidence is in linux-public-relays-results.json;
+  the linked workflow artifact additionally contains raw terminal transcripts.
+
+The signal failure reproduced before the shutdown-owner fix and passed after it.
+This is scoped evidence, not an all-edge-case guarantee. Internet egress, DNS,
+network-loss recovery, SIGKILL, machine reboot and macOS live VPN teardown were
+not validated. Bundled release variants are not implemented by this change.

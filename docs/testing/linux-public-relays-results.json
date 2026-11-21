@@ -1,0 +1,48 @@
+{
+  "before": {
+    "routes": "[{\"dst\":\"default\",\"gateway\":\"172.17.0.1\",\"dev\":\"eth0\",\"flags\":[]},{\"dst\":\"172.17.0.0/16\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"172.17.0.2\",\"flags\":[]}]\n",
+    "links": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\"},{\"ifindex\":2,\"link_index\":5,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"link_type\":\"ether\",\"address\":\"6e:f0:42:6d:b4:a1\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"link_netnsid\":0}]\n",
+    "processes": "    PID    PPID    PGID STAT COMMAND\n      1       0       1 Ss   bash -euc      apt-get update     DEBIAN_FRONTEND=noninteractive apt-get install -y \\       openvpn python3 python3-pyte iproute2 procps ca-certificates     uname -a > /evidence/platform.txt     openvpn --version >> /evidence/platform.txt     python3 /workspace/tools/live_vpngate.py   \n   2058       1       1 S    python3 /workspace/tools/live_vpngate.py\n   2061    2058       1 R    ps -eo pid,ppid,pgid,stat,args\n"
+  },
+  "status": "passed",
+  "sessions": [
+    {
+      "action": "q",
+      "connected": true,
+      "restarted": true,
+      "exit_code": 0,
+      "after": {
+        "routes": "[{\"dst\":\"default\",\"gateway\":\"172.17.0.1\",\"dev\":\"eth0\",\"flags\":[]},{\"dst\":\"172.17.0.0/16\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"172.17.0.2\",\"flags\":[]}]\n",
+        "links": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\"},{\"ifindex\":2,\"link_index\":5,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"link_type\":\"ether\",\"address\":\"6e:f0:42:6d:b4:a1\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"link_netnsid\":0}]\n",
+        "processes": "    PID    PPID    PGID STAT COMMAND\n      1       0       1 Ss   bash -euc      apt-get update     DEBIAN_FRONTEND=noninteractive apt-get install -y \\       openvpn python3 python3-pyte iproute2 procps ca-certificates     uname -a > /evidence/platform.txt     openvpn --version >> /evidence/platform.txt     python3 /workspace/tools/live_vpngate.py   \n   2058       1       1 S    python3 /workspace/tools/live_vpngate.py\n   2147    2058       1 R    ps -eo pid,ppid,pgid,stat,args\n"
+      }
+    },
+    {
+      "action": "r",
+      "connected": true,
+      "restarted": true,
+      "exit_code": 0,
+      "after": {
+        "routes": "[{\"dst\":\"default\",\"gateway\":\"172.17.0.1\",\"dev\":\"eth0\",\"flags\":[]},{\"dst\":\"172.17.0.0/16\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"172.17.0.2\",\"flags\":[]}]\n",
+        "links": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\"},{\"ifindex\":2,\"link_index\":5,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"link_type\":\"ether\",\"address\":\"6e:f0:42:6d:b4:a1\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"link_netnsid\":0}]\n",
+        "processes": "    PID    PPID    PGID STAT COMMAND\n      1       0       1 Ss   bash -euc      apt-get update     DEBIAN_FRONTEND=noninteractive apt-get install -y \\       openvpn python3 python3-pyte iproute2 procps ca-certificates     uname -a > /evidence/platform.txt     openvpn --version >> /evidence/platform.txt     python3 /workspace/tools/live_vpngate.py   \n   2058       1       1 S    python3 /workspace/tools/live_vpngate.py\n   2160    2058       1 R    ps -eo pid,ppid,pgid,stat,args\n"
+      }
+    },
+    {
+      "action": "TERM",
+      "connected": true,
+      "restarted": true,
+      "exit_code": 0,
+      "after": {
+        "routes": "[{\"dst\":\"default\",\"gateway\":\"172.17.0.1\",\"dev\":\"eth0\",\"flags\":[]},{\"dst\":\"172.17.0.0/16\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"172.17.0.2\",\"flags\":[]}]\n",
+        "links": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\"},{\"ifindex\":2,\"link_index\":5,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"link_type\":\"ether\",\"address\":\"6e:f0:42:6d:b4:a1\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"link_netnsid\":0}]\n",
+        "processes": "    PID    PPID    PGID STAT COMMAND\n      1       0       1 Ss   bash -euc      apt-get update     DEBIAN_FRONTEND=noninteractive apt-get install -y \\       openvpn python3 python3-pyte iproute2 procps ca-certificates     uname -a > /evidence/platform.txt     openvpn --version >> /evidence/platform.txt     python3 /workspace/tools/live_vpngate.py   \n   2058       1       1 S    python3 /workspace/tools/live_vpngate.py\n   2171    2058       1 R    ps -eo pid,ppid,pgid,stat,args\n"
+      }
+    }
+  ],
+  "after": {
+    "routes": "[{\"dst\":\"default\",\"gateway\":\"172.17.0.1\",\"dev\":\"eth0\",\"flags\":[]},{\"dst\":\"172.17.0.0/16\",\"dev\":\"eth0\",\"protocol\":\"kernel\",\"scope\":\"link\",\"prefsrc\":\"172.17.0.2\",\"flags\":[]}]\n",
+    "links": "[{\"ifindex\":1,\"ifname\":\"lo\",\"flags\":[\"LOOPBACK\",\"UP\",\"LOWER_UP\"],\"mtu\":65536,\"qdisc\":\"noqueue\",\"operstate\":\"UNKNOWN\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"txqlen\":1000,\"link_type\":\"loopback\",\"address\":\"00:00:00:00:00:00\",\"broadcast\":\"00:00:00:00:00:00\"},{\"ifindex\":2,\"link_index\":5,\"ifname\":\"eth0\",\"flags\":[\"BROADCAST\",\"MULTICAST\",\"UP\",\"LOWER_UP\"],\"mtu\":1500,\"qdisc\":\"noqueue\",\"operstate\":\"UP\",\"linkmode\":\"DEFAULT\",\"group\":\"default\",\"link_type\":\"ether\",\"address\":\"6e:f0:42:6d:b4:a1\",\"broadcast\":\"ff:ff:ff:ff:ff:ff\",\"link_netnsid\":0}]\n",
+    "processes": "    PID    PPID    PGID STAT COMMAND\n      1       0       1 Ss   bash -euc      apt-get update     DEBIAN_FRONTEND=noninteractive apt-get install -y \\       openvpn python3 python3-pyte iproute2 procps ca-certificates     uname -a > /evidence/platform.txt     openvpn --version >> /evidence/platform.txt     python3 /workspace/tools/live_vpngate.py   \n   2058       1       1 S    python3 /workspace/tools/live_vpngate.py\n   2174    2058       1 R    ps -eo pid,ppid,pgid,stat,args\n"
+  }
+}
