@@ -37,6 +37,27 @@ jobs:
               uname -a > /evidence/platform.txt
               openvpn --version >> /evidence/platform.txt
               python3 /workspace/tools/live_vpngate.py
+              DEBIAN_FRONTEND=noninteractive apt-get install -y \
+                curl build-essential pkg-config libssl-dev libcap-ng-dev
+              cd /tmp
+              curl -fsSLO https://swupdate.openvpn.org/community/releases/openvpn-2.7.8.tar.gz
+              echo "c070d1d2440b5a6fca6c2c68645c98cd492116ac36ef4f0946177115532c8e36  openvpn-2.7.8.tar.gz" | sha256sum -c -
+              tar -xzf openvpn-2.7.8.tar.gz
+              cd openvpn-2.7.8
+              ./configure --disable-lzo --disable-lz4 --disable-dco \
+                --disable-plugin-auth-pam --disable-systemd
+              make -j2
+              src/openvpn/openvpn --version > /evidence/openvpn27-platform.txt
+              export PYTHONPATH=/workspace/tools
+              python3 -c "from linux_state import network_state; print(network_state())" > /evidence/openvpn27-before.txt
+              runuser -u nobody -- env XDG_CONFIG_HOME=/tmp/vmate27-config \
+                /workspace/target/debug/vmate-cli --db /tmp/vmate27.db \
+                --openvpn-bin /tmp/openvpn-2.7.8/src/openvpn/openvpn \
+                scan --max 64 -t 5 --verbose > /evidence/openvpn27-scan.txt 2>&1
+              grep -q "Scanned:       277" /evidence/openvpn27-scan.txt
+              grep -Eq "Found total:   [1-9]" /evidence/openvpn27-scan.txt
+              python3 -c "from linux_state import network_state; print(network_state())" > /evidence/openvpn27-after.txt
+              cmp /evidence/openvpn27-before.txt /evidence/openvpn27-after.txt
             '
       - name: Preserve evidence even on failure
         if: always()

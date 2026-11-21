@@ -25,6 +25,18 @@ Actual startup setup errors still abort, retaining their full diagnostic text.
   stale unwriteable cache reports repair command, sudo run returns ownership,
   subsequent unprivileged scan succeeds. Fake AUTH_FAILED OpenVPN only.
 
-The exact options error on the reporting machine was erased by 1.2.3 and is
-not yet known. Do not claim its specific cause is reproduced or fully fixed.
-The same full scan with the old classifier did not reproduce it locally.
+## OpenVPN 2.7 reproduction
+
+An additional unprivileged scan with source-built OpenVPN 2.7.8 reproduced the
+abort with the old classifier. The preserved full diagnostic was:
+
+```
+Options error: option 'dhcp-option' cannot be used in this context ([PUSH-OPTIONS])
+```
+
+With the corrected classifier, the same 277-relay scan exited 0 and reported
+36 successful handshakes. This source build disabled DCO, LZO, LZ4 and PAM;
+it is not a claim of testing every distributor build or the reporting machine.
+The regression test uses the exact diagnostic. The public-relay workflow also
+builds pinned OpenVPN 2.7.8 and scans all 277 configs as nobody, requiring at
+least one handshake, full scan completion and unchanged network snapshots.

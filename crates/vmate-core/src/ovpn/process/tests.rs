@@ -53,7 +53,7 @@ async fn guard_cleans_targeted_children_without_killall() {
 async fn pushed_options_warning_does_not_abort_a_successful_probe() {
     let (tx, mut rx) = mpsc::channel(4);
     tx.send(
-        "Options error: Unrecognized option in [PUSH-OPTIONS]: block-outside-dns (2.6.14)".into(),
+        "Options error: option 'dhcp-option' cannot be used in this context ([PUSH-OPTIONS])".into(),
     )
     .await
     .unwrap();
