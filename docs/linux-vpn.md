@@ -2,9 +2,10 @@
 
 ## Confirmed code findings
 
-1. Scan defaults to 15s, connection to 5s. A passing slow server can time out
+1. Scan defaulted to 15s, connection to 5s. A passing slow server can time out
    twice and be deleted from history. Compare with `--connect-timeout 20s`
-   before blaming dead relays. Defaults are unchanged in this patch.
+   before blaming dead relays. The follow-up aligns the connection default to
+   15s; saved/explicit shorter settings remain respected.
 2. CleanupGuard incorrectly conditioned targeted cleanup on --killall.
    Fixed: targeted cleanup always runs; the global sweep remains opt-in.
 3. PID registry only appended, retaining dead PIDs across the entire scan.
@@ -13,7 +14,8 @@
 5. Terminal polling blocked async execution; noninteractive polling could spin
    without yielding. Fixed with an awaited timer and a zero-time terminal poll.
 6. Completed scan tasks accumulated until scheduling ended. They are now drained.
-7. Probe success deliberately skips route/interface configuration. It is not
+7. Probe success deliberately skips route/interface configuration. The follow-up
+   uses dev null so probes do not allocate a host tunnel either. It is not
    proof of working system routes, DNS, reachability, bandwidth or later uptime.
 
 These are code findings, not a reproduction of the reported machine's outage.
@@ -41,9 +43,8 @@ DNS, or traffic. Never publish private keys or auth-user-pass contents.
 
 ## Important remaining limits
 
-- Configs with daemon/log/syslog directives can detach or hide the output this
-  program monitors. Reject or sanitize these explicitly in a separate change;
-  command-line verbosity alone does not neutralize daemonization.
+- Configs with daemon/log/syslog directives can detach or hide monitored output.
+  The follow-up rejects these, plugins and nested config includes explicitly.
 - Config scripts/plugins execute privileged code. Only use trusted configs.
 - Hard kill cannot guarantee OS route/DNS rollback. Normal teardown remains
   graceful; abnormal-drop cleanup is only a process-liveness safety net.
@@ -111,3 +112,10 @@ sudoers policy. Do not grant NOPASSWD to a user-writable vmate executable or a
 root command accepting arbitrary VPN configs: that can allow root code execution
 through scripts/plugins. A future broker must validate fixed operations, own its
 binary/configs as root and authenticate IPC. No persistent grant is installed.
+
+## Current follow-up
+
+See docs/memory.md for actual 64/500-worker measurements, unchanged network-state
+checks and input-flood before/after results. See docs/privileges.md for rootless
+scanning and the explicit Linux NetworkManager mode. macOS raw connections still
+need privilege; a signed Network Extension is not implemented in this CLI.

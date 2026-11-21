@@ -21,3 +21,18 @@ Search with `git grep` before adding logic. No new crate is needed here.
 
 Paths in the table are relative to crates/. Existing test fixtures stay in
 feature test modules until there are two real cross-feature callers.
+
+## Added shared owners
+
+- `crates/vmate-core/src/system/signal.rs::cancel_on_shutdown`: abort-on-drop
+  signal listener used by scan, raw connect and managed connect, including SIGHUP.
+- `crates/vmate-cli/src/ui/input.rs::InputReader`: bounded dedicated terminal
+  reader shared by scan and connect; quit bypasses the ordinary command queue.
+- `crates/vmate-cli/src/ui/connect.rs::host`: TUI/console selection for raw,
+  all and managed commands. Console mode never requests raw terminal state.
+- `crates/vmate-core/src/ovpn/policy.rs::validate`: supervised-config policy
+  shared by probe preflight, probe execution and the real connection runner.
+- `tools/linux_state.py::network_state`: scan-isolation snapshots shared by
+  public-relay and local high-worker test harnesses.
+- `crates/vmate-cli/src/commands/managed.rs`: explicit existing-profile
+  NetworkManager ownership; it does not introduce another privileged daemon.

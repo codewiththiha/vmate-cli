@@ -31,8 +31,9 @@ from a keyboard-driven terminal UI backed by SQLite.
 
 - Rust **1.85+** (edition 2024)
 - [OpenVPN](https://openvpn.net/) — `openvpn` on `PATH`, or pass `--openvpn-bin`
-- Root/sudo for `scan`, `connect` and `all` (OpenVPN needs root/`CAP_NET_ADMIN`
-  to open `/dev/net/tun` or `utun`; vmate-cli re-executes under `sudo`
+- Root/sudo for raw `connect` and connecting `all` (OpenVPN needs root/`CAP_NET_ADMIN`
+  to open `/dev/net/tun` or `utun`; scans use a null device without sudo.
+  For raw connections vmate-cli re-executes under `sudo`
   automatically on an interactive terminal, preserving `$HOME` so storage stays
   under your user account. Set `VMATE_NO_ELEVATE=1` to run without elevation)
 - `killall` (optional) only if you pass `--killall` for the global OpenVPN sweep
@@ -428,3 +429,28 @@ Design principles:
 Enable local checks with `git config core.hooksPath .githooks` (Python 3.11+).
 Commit subjects are limited to 50 characters. Large commits need a structured
 body; see AGENTS.md. Run `python3 tools/shape_check.py --dups` before pushing.
+
+### Isolated scanning and service-managed connections
+
+Scans now use OpenVPN `dev null`, suppressed routes, and disabled external
+scripts. They test handshakes, not system VPN routing or Internet traffic. q,
+Ctrl+C, SIGTERM and terminal hangup cancel probes and await their teardown. Scanning still uses
+bandwidth, CPU and DNS: reduce `--max` if the network becomes slow.
+
+```sh
+vmate-cli scan --max 16 --timeout 20s
+nmcli -f NAME,UUID,TYPE connection show
+vmate-cli managed YOUR_EXISTING_VPN_UUID
+```
+
+The Linux `managed` command uses an existing NetworkManager VPN profile without
+elevating vmate. Desktop authorization still follows polkit; there is no blanket
+password-free root grant. See [privilege modes](docs/privileges.md).
+
+The default raw handshake timeout is now 15 seconds, matching the scan default.
+Previously saved values still win. Default scan concurrency remains 64; a real
+500-worker run used about 683–685 MiB child PSS before full TLS completion.
+See [measurements and limits](docs/memory.md) before choosing `--max 500`.
+Configs containing includes, plugins, daemon/output redirection, or unsupported
+probe device/script directives are rejected explicitly instead of being run
+outside supervision. These checks are not a sandbox for hostile configs.

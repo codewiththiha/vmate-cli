@@ -13,7 +13,8 @@ owns the process group until teardown.
 
 ## Current changes
 
-- Terminal key polling waits on Tokio before a nonblocking terminal probe.
+- One owned terminal thread feeds a bounded queue; quit has priority.
+  Cancellation-safe input waits are independent of rate-limited log rendering.
 - Targeted cleanup runs independently of the opt-in global killall sweep.
 - Handles own a shared registry reference, unregister after reaping and kill
   their process group on unexpected drop. Child kill-on-drop is a second guard.
@@ -32,3 +33,20 @@ Existing large functions are baselined, not represented as fully refactored.
 The shape scanner is deliberately heuristic: braces in strings, macros and
 complex signatures can mislead it. Review inline tests, routing matches and
 comments manually. Existing duplicate bodies are recorded, not silently ignored.
+
+## Follow-up isolation and privilege boundaries
+
+Scan probes use dev null, route/ifconfig noexec, route-nopull and script-security
+0. Policy preflight rejects includes/plugins/daemon/logging and unsupported
+probe device/script overrides. Pure scan no longer elevates. Existing configs
+are not rewritten unless the user requests --modify.
+
+Signal listener ownership is shared through an abort-on-drop guard. q/Ctrl+C/SIGHUP
+cancel scan workers; a canceled all-command does not hand matches to connect.
+Geo waits have a five-second deadline and cancellation wake. Real connected
+sessions receive the full graceful shutdown interval before force escalation.
+Piped/noninteractive connect uses a console host, not a raw terminal.
+
+Linux managed mode delegates an existing VPN profile to NetworkManager. It is
+an explicit alternative, not an automatic backend switch or a newly installed
+root daemon. See docs/privileges.md for authorization and crash limitations.
