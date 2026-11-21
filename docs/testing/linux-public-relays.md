@@ -1,0 +1,36 @@
+# Linux public relay evidence
+
+## 2026-11-21: initial runner investigation
+
+Commit f574028 ran on a real GitHub Ubuntu runner in a privileged Ubuntu 24.04
+container with its own network. The container used Linux 7.0.0-1017-azure and
+OpenVPN 2.6.19, OpenSSL 3.0.13. No private test server replaced built-in relays.
+
+- Ordinary Linux and macOS CI passed:
+  https://github.com/codewiththiha/vmate-cli/actions/runs/44894276675
+- Live run failed:
+  https://github.com/codewiththiha/vmate-cli/actions/runs/44894276641
+- Evidence artifact: linux-public-vpngate-evidence (seven-day retention).
+- Scanning 277 built-in UDP configs found two matches (JP and HK), exported
+  them and saved them to SQLite.
+- The JP terminal transcript displayed a connected status. The harness searched
+  raw ANSI output for a contiguous success string and missed incremental TUI
+  updates. It therefore reached its watchdog instead of sending interactive q.
+- After watchdog shutdown the snapshot contained OpenVPN PID 2108 in D state,
+  reparented to PID 1, and a host route to 60.73.48.68. No tun interface remained
+  in the final link snapshot. D means uninterruptible sleep, not a zombie.
+- This run does not prove q or restart cleanup. The later pyte-based harness
+  renders terminal updates before interpreting status. A rerun is required.
+
+A successful scan plus a connected TUI is not evidence of working Internet
+traffic. No egress or DNS assertion was performed. Container destruction removes
+the isolated test network but must not be counted as application cleanup.
+
+## Remaining investigation
+
+The signal path has two listeners: ConnectService cancellation and CLI
+SignalGuard emergency exit. The latter force-kills groups and exits without
+awaiting child reaping or graceful route removal. That competing owner needs
+consolidation before claiming graceful SIGTERM behavior. A D-state process
+cannot be guaranteed to exit by SIGKILL; record kernel and wait-channel details
+when reproducible. No release or all-edge-case guarantee is justified by this run.
