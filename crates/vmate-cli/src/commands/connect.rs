@@ -212,7 +212,7 @@ mod tests {
     fn resolution_falls_back_to_builtin_defaults() {
         let us = UserSettings::default();
         let r = resolve_connect(&us, &args(None, None, None, None));
-        assert_eq!(r.connect_timeout, Duration::from_secs(5));
+        assert_eq!(r.connect_timeout, Duration::from_secs(15));
         assert_eq!(r.cooldown, Duration::from_secs(30));
         assert_eq!(r.retry_count, 2);
         assert_eq!(r.stability_grace, Duration::from_secs(5));

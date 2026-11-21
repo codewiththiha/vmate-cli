@@ -21,6 +21,17 @@ fn validate_content(content: &str, probe: bool) -> Result<()> {
         }
         let directive = line.split_whitespace().next().unwrap_or("");
         let directive = directive.trim_start_matches("--").trim_matches(['\'', '"']);
+        if raw
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .contains(['\\', '\'', '"'])
+        {
+            bail!(
+                "quoted or escaped directive names are unsupported on line {}",
+                index + 1
+            );
+        }
         let supervised = [
             "config",
             "daemon",

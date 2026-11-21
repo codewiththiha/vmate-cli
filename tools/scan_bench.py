@@ -58,7 +58,7 @@ def benchmark(args, workers, quit_key):
     configs.mkdir(exist_ok=True)
     for index in range(workers):
         (configs / f'jp_{index:04}.ovpn').write_text(template)
-    command = [str(args.binary.resolve()), '--openvpn-bin', args.openvpn,
+    command = [str(args.binary.resolve()), '--no-elevate', '--openvpn-bin', args.openvpn,
                '--db', str(folder / 'scan.db'), 'scan', str(configs),
                '--max', str(workers), '--limit', str(workers + 1), '--timeout', '60s', '--no-save']
     master, slave = pty.openpty()
@@ -119,6 +119,7 @@ def main():
     parser.add_argument('--template', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--workers', type=int, nargs='+', default=[64, 500])
+    parser.add_argument('--actions', nargs='+', default=['q', 'CTRL_C', 'TERM'])
     parser.add_argument('--openvpn', default='/usr/sbin/openvpn')
     parser.add_argument('--port', type=int, default=11999)
     args = parser.parse_args()
@@ -135,7 +136,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     try:
         for workers in args.workers:
-            for action in ['q', 'CTRL_C', 'TERM']:
+            for action in args.actions:
                 result = benchmark(args, workers, action)
                 report['results'].append(result)
                 args.output.joinpath('results.json').write_text(json.dumps(report, indent=2))

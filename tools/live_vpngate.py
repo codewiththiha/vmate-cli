@@ -20,6 +20,10 @@ BIN = '/workspace/target/debug/vmate-cli'
 ENV = dict(os.environ, HOME='/tmp/vmate-live', TERM='xterm-256color')
 
 
+class RelayUnavailable(RuntimeError):
+    pass
+
+
 def snapshot():
     result = network_state()
     result['processes'] = subprocess.check_output(['ps', '-eo', 'pid,ppid,pgid,stat,args'], text=True)
@@ -33,6 +37,7 @@ def no_children():
 
 
 def session(config, action):
+    before = network_state()
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
     command = [BIN, '--db', '/tmp/live.db', 'connect', str(config),
@@ -77,9 +82,11 @@ def session(config, action):
         if process.poll() is None:
             process.send_signal(signal.SIGTERM)
         process.wait(timeout=10)
-        if not connected or not restarted:
-            raise RuntimeError(f'{action}: public relay did not complete required handshake(s)')
         no_children()
+        if network_state() != before:
+            raise RuntimeError(f'{action}: network state not restored')
+        if not connected or not restarted:
+            raise RelayUnavailable(f'{action}: public relay did not complete required handshake(s)')
         return {'action': action, 'connected': connected, 'restarted': restarted,
                 'exit_code': process.returncode, 'after': snapshot()}
     finally:
@@ -97,7 +104,7 @@ def main():
         no_children()
         scan_before = network_state()
         command = [BIN, '--db', '/tmp/live.db', 'scan', '--max', '8',
-                   '--limit', '2', '--timeout', '15s', '--export', '/tmp/matches']
+                   '--limit', '4', '--timeout', '15s', '--export', '/tmp/matches']
         with REPORT.joinpath('scan.log').open('wb') as log:
             process = subprocess.Popen(command, env=ENV, stdout=log, stderr=log, user=65534, group=65534)
             try:
@@ -109,11 +116,18 @@ def main():
         results['scan_network_unchanged'] = network_state() == scan_before
         if not results['scan_network_unchanged']:
             raise RuntimeError('scan changed system network state')
-        configs = list(Path('/tmp/matches').glob('*.ovpn'))
+        configs = sorted(Path('/tmp/matches').glob('*.ovpn'), key=lambda path: ('_JP' not in path.name, path.name))
         if not configs:
             raise RuntimeError('INCONCLUSIVE: no built-in public relay passed scanning')
         for action in ('q', 'r', 'CTRL_C', 'TERM'):
-            results['sessions'].append(session(configs[0], action))
+            for config in configs[:3]:
+                try:
+                    results['sessions'].append(session(config, action))
+                    break
+                except RelayUnavailable as error:
+                    results.setdefault('unavailable_relays', []).append(str(error))
+            else:
+                raise RelayUnavailable(f'{action}: no available relay completed the test')
         results['status'] = 'passed'
     except Exception as error:
         results['status'] = 'failed_or_inconclusive'
