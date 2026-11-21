@@ -72,8 +72,8 @@ def session(config, action):
                 if action == 'r':
                     os.write(master, b'r')
                     screen.reset()
-                elif action == 'TERM':
-                    process.send_signal(signal.SIGTERM)
+                elif action in ('TERM', 'HUP'):
+                    process.send_signal(signal.SIGHUP if action == 'HUP' else signal.SIGTERM)
                 else:
                     os.write(master, b'\x03' if action == 'CTRL_C' else b'q')
             elif not restarted and saw_reconnecting and 'Connected: ' in visible:
@@ -119,7 +119,7 @@ def main():
         configs = sorted(Path('/tmp/matches').glob('*.ovpn'), key=lambda path: ('_JP' not in path.name, path.name))
         if not configs:
             raise RuntimeError('INCONCLUSIVE: no built-in public relay passed scanning')
-        for action in ('q', 'r', 'CTRL_C', 'TERM'):
+        for action in ('q', 'r', 'CTRL_C', 'TERM', 'HUP'):
             for config in configs[:3]:
                 try:
                     results['sessions'].append(session(config, action))

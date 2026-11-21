@@ -203,9 +203,10 @@ impl ConnectService {
                         let connected_at = std::time::Instant::now();
                         let exit = self
                             .monitor_connected(&candidate, &mut handle, host, cancel)
-                            .await?;
+                            .await;
                         let _ = host.notify("Disconnecting OpenVPN...").await;
                         handle.kill_graceful(self.killer.as_ref()).await;
+                        let exit = exit?;
                         match exit {
                             Phase2Exit::Quit => {
                                 host.finish().await?;
@@ -281,7 +282,6 @@ impl ConnectService {
                         }
                         host.notify(&format!("{reason}; retrying {}", candidate.country))
                             .await?;
-                        // candidate unchanged -> retry
                     }
                 }
             }

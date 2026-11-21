@@ -88,8 +88,8 @@ def benchmark(args, workers, quit_key):
                 break
             time.sleep(0.1)
         sent = time.monotonic()
-        if quit_key == 'TERM':
-            process.send_signal(signal.SIGTERM)
+        if quit_key in ('TERM', 'HUP'):
+            process.send_signal(signal.SIGHUP if quit_key == 'HUP' else signal.SIGTERM)
         else:
             os.write(master, b'q' if quit_key == 'q' else b'\x03')
         process.wait(timeout=12)
@@ -119,7 +119,7 @@ def main():
     parser.add_argument('--template', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--workers', type=int, nargs='+', default=[64, 500])
-    parser.add_argument('--actions', nargs='+', default=['q', 'CTRL_C', 'TERM'])
+    parser.add_argument('--actions', nargs='+', default=['q', 'CTRL_C', 'TERM', 'HUP'])
     parser.add_argument('--openvpn', default='/usr/sbin/openvpn')
     parser.add_argument('--port', type=int, default=11999)
     args = parser.parse_args()

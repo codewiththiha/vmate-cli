@@ -39,8 +39,8 @@ def terminal_exit(command, action, env):
         if process.poll() is not None:
             raise RuntimeError('CLI exited before input test')
         sent = time.monotonic()
-        if action == 'TERM':
-            process.send_signal(signal.SIGTERM)
+        if action in ('TERM', 'HUP'):
+            process.send_signal(signal.SIGHUP if action == 'HUP' else signal.SIGTERM)
         else:
             os.write(master, b'q' if action == 'q' else b'\x03')
         process.wait(timeout=5)
@@ -85,7 +85,7 @@ def main():
     args = parser.parse_args()
     results = []
     with tempfile.TemporaryDirectory() as temp:
-        for action in ('q', 'CTRL_C', 'TERM'):
+        for action in ('q', 'CTRL_C', 'TERM', 'HUP'):
             directory = Path(temp) / action
             directory.mkdir()
             results.append(exercise(args.binary, action, directory))

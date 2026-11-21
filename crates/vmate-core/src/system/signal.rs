@@ -5,9 +5,10 @@
 pub enum ShutdownReason {
     CtrlC,
     Term,
+    Hangup,
 }
 
-/// Wait for Ctrl+C or SIGTERM.
+/// Wait for Ctrl+C, SIGTERM, or terminal hangup.
 pub async fn shutdown_signal() -> ShutdownReason {
     #[cfg(unix)]
     {
@@ -21,7 +22,12 @@ pub async fn shutdown_signal() -> ShutdownReason {
             }
         };
 
+        let mut hangup = signal(SignalKind::hangup()).ok();
         tokio::select! {
+            _ = async {
+                if let Some(signal) = &mut hangup { signal.recv().await; }
+                else { std::future::pending::<()>().await; }
+            } => ShutdownReason::Hangup,
             _ = tokio::signal::ctrl_c() => ShutdownReason::CtrlC,
             _ = sigterm.recv() => ShutdownReason::Term,
         }
