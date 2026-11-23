@@ -52,6 +52,31 @@
   ],
   "public_release": false,
   "capture_directory": "review/runner-parity",
-  "latest_hosted_run": "not dispatched: GitHub authentication unavailable",
-  "parity": "real CLI + engine shared database and actual Slint binding, fixture OpenVPN"
+  "parity": "real CLI + engine shared database and actual Slint binding, fixture OpenVPN",
+  "hosted_532f3c2": {
+    "desktop_review": {
+      "run": 45125829154,
+      "conclusion": "success",
+      "matrix": [
+        "linux-amd64",
+        "linux-arm64",
+        "macos-x86_64",
+        "macos-arm64"
+      ],
+      "editions": [
+        "system",
+        "bundled"
+      ]
+    },
+    "live_vpngate": {
+      "run": 45125829140,
+      "conclusion": "success"
+    },
+    "general_ci": {
+      "run": 45125829214,
+      "linux": "success",
+      "macos": "test click offset failed; corrected to exercise both chrome layouts"
+    },
+    "networkmanager_tunnel_tested": false
+  }
 }

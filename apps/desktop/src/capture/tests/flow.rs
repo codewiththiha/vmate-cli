@@ -57,6 +57,21 @@ pub(super) fn check(
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(!port.snapshot().events.is_empty());
+    for mac in [false, true] {
+        app.set_mac(mac);
+        exercise_scan(app, &port, window, pixels, click);
+    }
+    drop(engine);
+}
+
+fn exercise_scan(
+    app: &AppWindow,
+    port: &vmate_engine::Port,
+    window: &MinimalSoftwareWindow,
+    pixels: &mut [slint::Rgb8Pixel],
+    click: &dyn Fn(f32, f32),
+) {
+    let deadline = Instant::now() + Duration::from_secs(20);
     app.set_page(0);
     app.set_diagnostic("".into());
     app.set_busy(false);
@@ -66,7 +81,7 @@ pub(super) fn check(
     window.draw_if_needed(|renderer| {
         renderer.render(pixels, 1160);
     });
-    click(1080.0, 157.0);
+    click(1080.0, if app.get_mac() { 117.0 } else { 157.0 });
     assert!(
         port.snapshot().busy,
         "actual Slint callback must submit a scan to the actor"
@@ -87,7 +102,6 @@ pub(super) fn check(
         277,
         "actor results must reach the real Slint model"
     );
-    drop(engine);
 }
 
 pub(super) fn brand_alignment(pixels: &[slint::Rgb8Pixel]) {

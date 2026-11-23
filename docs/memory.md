@@ -125,3 +125,18 @@ sessions. No evidence justifies increasing the universal default to 500.
 - VMATE_DB override now shared; CLI-only scan flags do not rewrite GUI presets.
 - New hosted runs blocked by absent GitHub authentication (push dry-run rejected).
 - Older run 45118973809: Linux review passed; package jobs failed. Logs inaccessible.
+
+
+### Hosted runner verification on 532f3c2
+
+- desktop-review run 45125829154 passed: Linux native/capture review and release
+  packages on Linux amd64/arm64 and macOS Intel/Apple Silicon, both editions.
+- live-vpngate run 45125829140 passed built-in public-relay checks.
+- Earlier live run 45125260430 verified five raw CLI session actions, network
+  restoration, engine reading four CLI relays, and 277 engine probes/32 successes.
+- Authenticated logs identified Ubuntu /lib versus /usr/lib package provenance;
+  bounded alias verification fixes redistribution notice collection.
+- macOS shared-history comparison now uses canonical /private/var paths.
+- macOS workspace run 45125829214 exposed a test click offset from hiding Linux
+  chrome; the revised test exercises both content layouts locally.
+- NetworkManager authorization/automatic tunnel egress remain unvalidated.

@@ -94,3 +94,18 @@ GitHub authentication. No new hosted result is claimed. Public API inspection of
 older run 45118973809 (commit 6a6d5c2) showed linux-review passed, Linux package
 staging failed, and macOS artifact uploads failed. Failure logs require authorized
 access; those old results cannot establish the current branch's packaging status.
+
+## Hosted follow-up
+
+Authentication was restored for the authorized branch push. Desktop review run
+45125829154 passed every package job (Linux amd64/arm64 and Mac Intel/Apple Silicon,
+system/bundled) plus Linux native/capture/contract review on revision 532f3c2.
+Live VPN Gate run 45125829140 also passed on that revision. The macOS workspace
+job exposed a headless test coordinate that still counted the Linux-only title
+bar; the revised test submits real engine scans in both chrome layouts.
+The earlier canonical-path assertion and merged-/usr provenance failures were
+corrected from authenticated runner logs, rather than hidden by longer timeouts.
+
+These successes cover package construction and raw CLI public-relay sessions.
+They do not establish desktop NetworkManager authorization, managed tunnel egress,
+macOS native chrome interaction, notarization, or a public release approval.
