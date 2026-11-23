@@ -8,6 +8,7 @@ import plistlib
 import shutil
 import subprocess
 import tarfile
+import native
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,13 +29,22 @@ def linux(args, stage):
     shutil.copytree(ROOT / 'packaging/licenses', stage / 'usr/share/doc/vmate/licenses')
     for name in ('LICENSE', 'README.md'):
         copy(ROOT / name, stage / 'usr/share/doc/vmate' / name)
+    if args.notices:
+        copy(args.notices, stage / 'usr/share/doc/vmate/THIRD-PARTY-NOTICES.txt')
+    copy(ROOT / 'docs/desktop-installation.md', stage / 'usr/share/doc/vmate/INSTALLATION.md')
+    copy(ROOT / 'LICENSE', stage / 'usr/share/licenses/vmate/LICENSE')
+    shutil.copytree(ROOT / 'packaging/licenses', stage / 'usr/share/licenses/vmate/dependencies')
     control = stage / 'DEBIAN/control'
     control.parent.mkdir()
     dependency = ', openvpn' if args.variant == 'system' else ''
-    control.write_text(f'''Package: vmate
+    package = 'vmate-bundled' if args.variant == 'bundled' else 'vmate'
+    conflict = 'vmate' if args.variant == 'bundled' else 'vmate-bundled'
+    control.write_text(f'''Package: {package}
 Version: {args.version}
 Architecture: {args.arch}
 Maintainer: codewiththiha <kt0071@gmail.com>
+Conflicts: {conflict}
+Provides: vmate (= {args.version})
 Depends: libc6 (>= 2.39), libxkbcommon0, libxkbcommon-x11-0, libfontconfig1, libx11-6, libx11-xcb1, libxcursor1, libxrandr2, libxi6, libxcb1, libwayland-client0{dependency}
 Recommends: network-manager-openvpn, xdg-desktop-portal
 Description: OpenVPN relay library and system VPN frontend
@@ -42,6 +52,10 @@ Description: OpenVPN relay library and system VPN frontend
     subprocess.run(['dpkg-deb', '-Zgzip', '-z6', '--root-owner-group', '--build', str(stage),
                     str(args.output / f'{stage.name}.deb')], check=True)
     shutil.rmtree(control.parent)
+    if args.native_formats:
+        if args.arch == 'amd64':
+            native.arch(args, stage)
+        native.rpm(args, stage)
     copy(ROOT / 'packaging/linux/install.sh', stage / 'install.sh')
     with tarfile.open(args.output / f'{stage.name}.tar.gz', 'w:gz') as archive:
         archive.add(stage, arcname=stage.name)
@@ -65,6 +79,8 @@ def macos(args, stage):
         subprocess.run([str(ROOT / 'packaging/build-openvpn.sh'),
                         str(resources / 'openvpn')], check=True)
     shutil.copytree(ROOT / 'packaging/licenses', resources / 'licenses')
+    if args.notices:
+        copy(args.notices, resources / 'THIRD-PARTY-NOTICES.txt')
     copy(ROOT / 'LICENSE', resources / 'LICENSE')
     copy(ROOT / 'docs/desktop-installation.md', resources / 'INSTALLATION.md')
     subprocess.run(['codesign', '--force', '--deep', '--sign', '-', str(app.parent)], check=True)
@@ -81,6 +97,8 @@ def main():
     parser.add_argument('--arch', required=True)
     parser.add_argument('--variant', choices=['system', 'bundled'], required=True)
     parser.add_argument('--version', default='1.2.4')
+    parser.add_argument('--native-formats', action='store_true')
+    parser.add_argument('--notices', type=Path)
     parser.add_argument('--binaries', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()

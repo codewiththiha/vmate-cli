@@ -1,6 +1,6 @@
 # Desktop installation and authorization
 
-This branch adds a Slint desktop preview, not a public signed release.
+This branch adds a Slint desktop preview, an experimental prerelease, not a stable signed release.
 The GUI is Rust + Slint; there is no Swift application or embedded webview.
 
 ## Editions
@@ -14,7 +14,7 @@ Bundling the executable does not bundle a permission grant or a VPN service.
 
 ## Linux
 
-Packages: native amd64/arm64 .deb and relocatable .tar.gz. Install a .deb with
+Packages: amd64/arm64 .deb and .rpm, x86_64 Arch .pkg.tar.zst, and .tar.gz. Install a .deb with
 `sudo apt install ./vmate-*.deb`, or unpack the matching tar and run install.sh
 as your user. The tar installer defaults to ~/.local and registers the launcher,
 icon and CLI. `install.sh --uninstall` removes app files, not user settings or
@@ -25,7 +25,7 @@ still owns the window. Menu integration varies across desktop environments.
 
 Setup detects Arch/Manjaro, Fedora and Debian-family package instructions.
 Install NetworkManager's OpenVPN plugin and run your desktop polkit agent.
-Import a saved relay in the library; choose its profile on Connections. The
+Connect from Home, or explicitly import a relay and choose its system profile. The
 system may prompt for permission or missing secrets. No password is cached by
 vmate and no sudoers rule is installed. Already-active profiles are refused.
 Stop/disconnect/quit cancels the owned session and asks NetworkManager to stop it.

@@ -1,6 +1,15 @@
 name: desktop-review
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish an experimental GUI prerelease after all checks
+        type: boolean
+        default: false
+      release_tag:
+        description: Desktop-only prerelease tag (must not start with v)
+        type: string
+        default: desktop-v1.2.4-alpha.1
   push:
     branches: [main, feat/slint-desktop]
   pull_request:
@@ -56,7 +65,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev patchelf pkg-config
+        run: |
+          sudo sed -i 's/^Types: deb$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev patchelf pkg-config rpm zstd libarchive-tools
       - if: runner.os == 'macOS'
         run: |
           brew install openssl@3 lzo lz4 pkgconf dylibbundler cairo
@@ -65,15 +77,31 @@ jobs:
           echo /tmp/vmate-icons/bin >> "$GITHUB_PATH"
       - run: cargo test -p vmate-core -p vmate-engine --locked
       - run: cargo build -p vmate-cli -p vmate-desktop --release --locked
+      - name: Retain Rust dependency notices and matching source archives
+        run: |
+          python3 packaging/rust-notices.py license-assets
+          mkdir -p packages
+          cp license-assets/rust-sources-*.tar.gz packages/
+          cp license-assets/rust-inventory.json packages/rust-inventory-${{ matrix.platform }}-${{ matrix.arch }}.json
+          cp license-assets/THIRD-PARTY-NOTICES.txt packages/THIRD-PARTY-NOTICES-${{ matrix.platform }}-${{ matrix.arch }}.txt
       - name: Stage both editions
         run: |
-          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant system --binaries target/release --output packages
-          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant bundled --binaries target/release --output packages
+          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant system --binaries target/release --output packages --notices license-assets/THIRD-PARTY-NOTICES.txt ${{ runner.os == 'Linux' && '--native-formats' || '' }}
+          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant bundled --binaries target/release --output packages --notices license-assets/THIRD-PARTY-NOTICES.txt ${{ runner.os == 'Linux' && '--native-formats' || '' }}
       - name: Validate package contents and private executable
         run: python3 tools/package_check.py packages
+      - name: Native archive payload and dependency parity
+        if: runner.os == 'Linux'
+        run: python3 tools/native_package_check.py packages
+      - name: Install each native package in a disposable distribution
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && inputs.publish
+        run: python3 tools/native_package_check.py packages --install
       - name: Linux user installer smoke
         if: runner.os == 'Linux'
         run: python3 tools/install_smoke.py packages
+      - name: Keep platform checksum manifests distinct
+        if: success()
+        run: mv packages/checksums.json packages/checksums-${{ matrix.platform }}-${{ matrix.arch }}.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -82,6 +110,28 @@ jobs:
             packages/*.deb
             packages/*.tar.gz
             packages/*.dmg
-            packages/checksums.json
+            packages/*.rpm
+            packages/*.pkg.tar.zst
+            packages/*.json
+            packages/*.txt
           compression-level: 0
           retention-days: 7
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    needs: [linux-review, packages]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*-review
+          path: release-assets
+          merge-multiple: true
+      - name: Publish verified experimental GUI assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: python3 tools/publish_desktop.py release-assets

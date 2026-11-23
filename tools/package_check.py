@@ -25,6 +25,8 @@ def main():
             result = subprocess.check_output([str((prefix / 'bin/openvpn').resolve()), '--version'], text=True)
             assert 'OpenVPN 2.7.8' in result
             assert (prefix / 'share/licenses/openvpn/openvpn-2.7.8.tar.gz').is_file()
+            assert (prefix / 'share/licenses/library-manifest.json').is_file()
+            assert (prefix / 'share/sources').is_dir()
             if not mac:
                 linked = subprocess.check_output(['ldd', str(prefix / 'bin/openvpn')], text=True)
                 assert 'not found' not in linked, linked

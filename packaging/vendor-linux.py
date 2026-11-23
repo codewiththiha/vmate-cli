@@ -29,6 +29,23 @@ def package_owner(source):
     return owners.pop()
 
 
+def retain_source(prefix, package):
+    identity = subprocess.check_output(['dpkg-query', '-W',
+        '-f=${source:Package} ${source:Version}', package], text=True).split()
+    if len(identity) != 2:
+        raise RuntimeError(f'Missing source identity: {package}')
+    destination = prefix / 'share/sources' / identity[0]
+    if destination.exists():
+        return
+    destination.mkdir(parents=True)
+    subprocess.run(['apt-get', 'source', '--download-only', '--only-source',
+                    f'{identity[0]}={identity[1]}'], cwd=destination, check=True)
+    (destination / 'BUILD.txt').write_text(
+        f'Distributor source: {identity[0]} {identity[1]}\n'
+        'Build with the matching Debian/Ubuntu source package and build dependencies.\n'
+        'The .dsc and Debian patches are included alongside upstream archives.\n')
+
+
 def main():
     prefix = Path(sys.argv[1]).resolve()
     executable = prefix / 'bin/openvpn'
@@ -47,6 +64,7 @@ def main():
         manifest.append({'source': name, 'name': target.name,
                          'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
         package = package_owner(source)
+        retain_source(prefix, package)
         notice = Path('/usr/share/doc') / package.split(':')[0] / 'copyright'
         if not notice.exists():
             raise RuntimeError(f'missing redistribution notice: {package}')

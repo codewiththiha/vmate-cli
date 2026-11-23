@@ -77,3 +77,12 @@ feature test modules until there are two real cross-feature callers.
   against the same WAL database; no network or authentication claim.
 - `capture/tests/flow.rs`: real Slint callbacks through the actor to shared scan
   and storage, selected-path stability, and pixel-based branding alignment.
+
+- `packaging/native.py`: Arch and RPM assembly from the same Linux staging tree;
+  no separate GUI/CLI binary build or private/system payload duplication.
+- `packaging/rust-notices.py` and `rust_licenses.py`: actual target runtime/build
+  dependency inventories, Cargo.lock-verified crate archives and pinned notices.
+- `tools/native_package_check.py`: native payload/dependency parity and disposable
+  distribution installation checks; not live VPN or authorization tests.
+- `tools/publish_desktop.py`: validates every edition and checksum before exposing
+  a draft as an explicitly requested desktop prerelease; never stable CLI tags.

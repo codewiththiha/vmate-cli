@@ -16,11 +16,17 @@ COPYING and source provenance ship with bundled editions. OpenVPN carries GPL
 terms and an OpenSSL exception; inspect the exact included notices. Bundled
 shared libraries have their own licenses. Linux packaging copies distributor
 copyright files and records their final hashes. macOS dylibbundler copies runtime
-dylibs; corresponding license/source offers still need a redistribution audit.
+dylibs; matching Homebrew source archives, recipes and notices are retained.
 
-Release gates: cargo-about or equivalent dependency inventory; review all Slint,
-OpenVPN, OpenSSL, LZO, LZ4 and bundled-library notices; provide any required
-corresponding source/relinking material. Developer-ID signing and notarization
-are separate requirements, not a substitute for license compliance.
-No public GUI release should bypass these gates. Packaging CI creates review
-artifacts only and never publishes a GitHub release.
+Experimental prerelease packaging collects notices and exact source archives for
+Rust runtime/build dependencies, with pinned upstream-commit recovery when crate
+archives omit license files. Linux library sources retain distributor .dsc files
+and patches; macOS libraries retain matching Homebrew sources and recipes. Unknown
+provenance or missing notices stop the build. Rust sources/inventories are release
+assets; bundled engine/library sources accompany the private payload.
+
+This is a reproducible-notice/source retention check, not independent legal advice
+or a supply-chain audit. Developer-ID signing/notarization remain absent, and the
+public release notes must state experimental status and functional limitations.
+Publishing occurs only through the explicitly requested prerelease job, after all
+package and Linux review gates pass; ordinary review pushes do not publish.

@@ -27,6 +27,7 @@ cp "$WORK/openvpn.tar.gz" "$PREFIX/share/licenses/openvpn/openvpn-$VERSION.tar.g
 cp "$ROOT/packaging/openvpn.lock.json" "$PREFIX/share/licenses/openvpn/source.json"
 if [ "$(uname -s)" = Darwin ]; then
   dylibbundler -od -b -x "$PREFIX/bin/openvpn" -d "$PREFIX/lib" -p '@executable_path/../lib/'
+  python3 "$ROOT/packaging/mac-sources.py" "$PREFIX"
 else
   python3 "$ROOT/packaging/vendor-linux.py" "$PREFIX"
 fi
