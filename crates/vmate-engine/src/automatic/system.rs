@@ -23,6 +23,7 @@ impl Backend for Port {
         {
             let mut state = self.state.lock().unwrap();
             state.snapshot.connected = false;
+            state.snapshot.connected_country = relay.country.clone();
             state.snapshot.status = "Connecting".into();
             state.snapshot.message = relay.name.clone();
         }
@@ -49,6 +50,7 @@ impl Backend for Port {
         output("nmcli", &["connection", "delete", "uuid", uuid]).await?;
         let mut state = self.state.lock().unwrap();
         state.snapshot.connected = false;
+        state.snapshot.connected_country.clear();
         state.snapshot.status = "Connecting".into();
         if let Err(error) = result {
             let diagnostic = format!("{error:#}").to_lowercase();

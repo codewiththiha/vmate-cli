@@ -29,13 +29,13 @@ export component RelayList inherits Rectangle {
         if root.rows.length == 0: Text { text: root.query == "" ? "No saved relays. Connect from Home to find one." : "No matching relays"; color: Theme.muted; wrap: word-wrap; vertical-stretch: 1; }
                 if root.rows.length > 0: ScrollView { content-width: self.width - 12px;
                     VerticalBox { spacing: 0px; padding: 0px;
-                        for row[index] in root.rows: Rectangle { height: 73px; background: root.selected == index ? Theme.tint : hit.has-hover ? #f0f2ec : Theme.paper;
+                        for row[index] in root.rows: Rectangle { height: 73px; background: root.selected == index ? Theme.tint : hit.has-hover ? Theme.hover : Theme.paper;
                             HorizontalBox { padding-left: 12px; padding-right: 12px; spacing: 12px;
                                 VerticalBox { alignment: center; spacing: 5px;
                                     Text { text: row.name; color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
                                     Text { text: row.checked; color: Theme.muted; font-size: 12px; overflow: elide; }
                                 }
-                                Text { text: row.country == "UNKNOWN" ? "Not looked up" : row.country; color: Theme.muted; font-size: 12px; vertical-alignment: center; horizontal-alignment: right; max-width: 100px; }
+                                Text { text: row.country == "" || row.country == "UNKNOWN" ? "Unknown country" : row.country; color: Theme.muted; font-size: 12px; vertical-alignment: center; horizontal-alignment: right; max-width: 160px; overflow: elide; }
                             }
                             Rectangle { y: parent.height - 1px; height: 1px; width: parent.width; background: Theme.rule; }
                             focus := FocusScope {

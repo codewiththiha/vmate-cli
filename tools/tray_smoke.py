@@ -107,6 +107,9 @@ async def exercise(binary, bus, watcher, profile, mode):
                 await menu_action(bus, service, 'Settings')
                 await asyncio.sleep(0.2)
                 window = visible()[0]
+                subprocess.run(['xdotool', 'mousemove', '--window', window, '700', '400',
+                                'click', '--repeat', '25', '--delay', '15', '5'], check=True)
+                await asyncio.sleep(0.2)
                 subprocess.run(['xdotool', 'mousemove', '--window', window, '201', '619',
                                 'click', '1', 'mousemove', '--window', window, '260', '722',
                                 'click', '1'], check=True)

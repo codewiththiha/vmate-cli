@@ -32,7 +32,9 @@ def pointer_input(window, profile):
     assert output('xdotool', 'getwindowgeometry', '--shell', window) == baseline
     output('xdotool', 'mousemove', '--window', window, '70', '326', 'click', '1')
     time.sleep(0.2)
-    output('xdotool', 'mousemove', '--window', window, '450', '175', 'click', '1',
+    output('xdotool', 'mousemove', '--window', window, '450', '122', 'click', '1',
+           'key', 'Down', 'Down', 'Return')
+    output('xdotool', 'mousemove', '--window', window, '450', '372', 'click', '1',
            'key', 'ctrl+a', 'type', '--clearmodifiers', 'Pointer regression')
     output('xdotool', 'mousemove', '--window', window, '260', '722', 'click', '1')
     path = profile / 'vmate-cli/desktop.json'
@@ -41,6 +43,7 @@ def pointer_input(window, profile):
         if path.exists() and any(p['name'] == 'Pointer regression'
                                  for p in json.loads(path.read_text())['presets']):
             assert not json.loads(path.read_text())['tray_enabled']
+            assert json.loads(path.read_text())['appearance'] == 'dark'
             return
         time.sleep(0.05)
     raise AssertionError('Real sidebar, text entry and Save must persist the typed preset')
@@ -71,6 +74,7 @@ def main():
             assert app.returncode == 0, stderr.decode(errors='replace')
             print(json.dumps({'window_class': 'vmate', 'taskbar_identity': 'passed',
                               'native_frame': 'passed', 'pointer_input': 'passed',
+                              'theme_selection_persisted': 'passed',
                               'minimize': 'passed', 'maximize': 'passed',
                               'close_exit_code': app.returncode,
                               'network_operations': 'none requested'}))

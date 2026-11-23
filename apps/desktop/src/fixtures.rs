@@ -79,7 +79,7 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
             "14:32:07  All probe processes reaped. No tunnel created.".into(),
             "14:31:49  Testing VPN Gate built-in UDP configurations.".into(),
             "14:31:48  Using private bundled OpenVPN 2.7.8.".into(),
-            "14:31:48  Country lookup disabled. No relay IPs sent to ipinfo.io.".into(),
+            "14:31:48  Relay-country lookup enabled · ipinfo.io / cached results.".into(),
         ],
         ..Snapshot::default()
     };
@@ -111,6 +111,7 @@ fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
         "connected-library" => {
             snapshot.busy = true;
             snapshot.connected = true;
+            snapshot.connected_country = "JP".into();
             snapshot.status = "Connected".into();
             snapshot.message =
                 "A system VPN session is active. Disconnect in Connections before scanning.".into();
@@ -136,6 +137,7 @@ fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
             app.set_page(1);
             snapshot.busy = true;
             snapshot.connected = true;
+            snapshot.connected_country = "JP".into();
             snapshot.status = "Connected".into();
             snapshot.message = "Connected through NetworkManager · VPN Gate Japan".into();
         }
@@ -181,6 +183,7 @@ fn home(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
         "home-connected" => {
             snapshot.busy = true;
             snapshot.connected = true;
+            snapshot.connected_country = "JP".into();
             snapshot.status = "Connected".into();
         }
         "home-retrying" => {

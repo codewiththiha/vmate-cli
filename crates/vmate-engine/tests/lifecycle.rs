@@ -33,6 +33,10 @@ fn start_engine(script: &str) -> (tempfile::TempDir, Engine, Port) {
     .unwrap();
     let port = engine.port();
     wait(&port, || !port.snapshot().events.is_empty());
+    let mut preferences = port.snapshot().preferences;
+    preferences.country_lookup = false;
+    port.send(Command::Save(preferences)).unwrap();
+    wait(&port, || !port.snapshot().busy);
     (dir, engine, port)
 }
 

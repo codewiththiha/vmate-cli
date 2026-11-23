@@ -60,7 +60,9 @@ fn main() -> Result<()> {
     println!(
         "{}",
         serde_json::json!({"mode": args[4], "tested": state.completed,
-        "saved_relays": state.relays.len(), "export_verified": true, "tunnel_tested": false})
+        "saved_relays": state.relays.len(), "export_verified": true, "tunnel_tested": false,
+        "country_lookup_enabled": state.preferences.country_lookup,
+        "known_country_relays": state.relays.iter().filter(|r| r.country != "UNKNOWN" && !r.country.is_empty()).count()})
     );
     Ok(())
 }

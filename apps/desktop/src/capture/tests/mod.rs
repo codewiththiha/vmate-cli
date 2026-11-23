@@ -1,4 +1,5 @@
 mod flow;
+mod theme;
 use super::*;
 use slint::{
     LogicalPosition,
@@ -57,6 +58,7 @@ fn actual_component_renders_and_accepts_pointer_navigation() {
     );
     home_controls(&app, &window, &mut pixels, &click);
     flow::check(&app, &window, &mut pixels, &click);
+    theme::check(&app, &window, &mut pixels);
     app.hide().unwrap();
 }
 

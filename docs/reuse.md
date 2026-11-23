@@ -93,3 +93,12 @@ feature test modules until there are two real cross-feature callers.
   against a disposable D-Bus host; not proof of GNOME/KDE/Wayland integration.
 - `tools/native_smoke.py`: real X11 pointer navigation, text entry and saved
   settings, body-drag rejection, native title-bar maximize, minimize and close.
+
+- `apps/desktop/ui/tokens.slint::Theme`: custom colors derive their light/dark
+  choice from the standard widget palette background, preventing mixed palettes.
+- `apps/desktop/ui/tokens.slint::SettingField`: consistent label/input alignment,
+  outlined control surface and fixed field heights, shared by edits and choices.
+- `apps/desktop/src/country.rs`: ISO country names and connected-relay labels;
+  never infer countries from profile names or claim verified tunnel egress.
+- `apps/desktop/src/capture/tests/theme.rs`: actual rendered input contrast in
+  both palettes at narrow/desktop widths, plus known/unknown connected labels.

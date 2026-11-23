@@ -45,6 +45,24 @@ Raw CLI connect still needs explicit sudo and trusted configs. Avoid blanket
 NOPASSWD grants, setuid executables or permanent capabilities on user-writeable
 binaries. Old root-owned config caches may require the documented one-time chown.
 
+## Appearance and relay countries
+
+Settings offers System, Light and Dark appearance. The preview is immediate;
+Save settings persists it. Application surfaces and standard controls share one
+palette, including input text, popups, checkboxes, selection and disabled states.
+
+New or missing preferences enable country lookup using the existing shared
+ipinfo.io token and persistent IP cache. IPINFO_TOKEN can override the token.
+Saved explicit opt-outs remain disabled. Enable lookup and rescan to resolve
+older unknown entries; a scan does not rewrite history through background API
+requests. Lookup sends relay IPs to ipinfo.io and is subject to network failures
+and the shared token's limits. Unknown country is not a scan failure.
+
+Home shows Connected · Japan (or another ISO country name) only for a connected
+relay whose country is known. Unknown relays and external system profiles without
+relay metadata show Connected. This describes relay metadata, not verified exit
+IP, routing, DNS or user location. Disconnect and subsequent attempts clear it.
+
 ## macOS
 
 Packages: separate Apple Silicon and Intel .dmg images with vmate.app, plus a

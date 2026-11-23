@@ -2,6 +2,7 @@
 
 mod binding;
 mod capture;
+mod country;
 mod fixtures;
 #[cfg(target_os = "linux")]
 mod tray;

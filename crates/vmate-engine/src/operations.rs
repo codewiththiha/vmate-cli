@@ -30,6 +30,7 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
             let mut state = port.state.lock().unwrap();
             state.snapshot.busy = true;
             state.snapshot.error.clear();
+            state.snapshot.connected_country.clear();
         }
         let managed = matches!(&command, Command::Connect(_));
         let automatic = matches!(&command, Command::AutoConnect);
@@ -42,6 +43,7 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
         let mut state = port.state.lock().unwrap();
         state.snapshot.busy = false;
         state.snapshot.connected = false;
+        state.snapshot.connected_country.clear();
         state.snapshot.status = if uncertain {
             "Check system VPN"
         } else {

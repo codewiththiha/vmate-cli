@@ -1,12 +1,36 @@
+import { Palette, VerticalBox, HorizontalBox } from "std-widgets.slint";
+
 export global Theme {
-    out property <color> paper: #f8f7f3;
-    out property <color> surface: #ffffff;
-    out property <color> ink: #222c28;
-    out property <color> muted: #59665f;
-    out property <color> rule: #dcdfd8;
-    out property <color> pine: #20584a;
-    out property <color> tint: #e8eee8;
+    private property <color> widget-background: Palette.background;
+    out property <bool> dark: widget-background.to-oklch().lightness < 0.5;
+    out property <color> paper: dark ? #191e1c : #f8f7f3;
+    out property <color> surface: dark ? #252d29 : #ffffff;
+    out property <color> ink: dark ? #ecf1ed : #222c28;
+    out property <color> muted: dark ? #b4c1b8 : #59665f;
+    out property <color> rule: dark ? #414d46 : #dcdfd8;
+    out property <color> field-border: dark ? #728579 : #8a9a90;
+    out property <color> pine: dark ? #296d5c : #20584a;
+    out property <color> tint: dark ? #31493d : #e8eee8;
+    out property <color> sidebar: dark ? #202923 : #eef0e9;
+    out property <color> hover: dark ? #34433a : #e4e9e1;
+    out property <color> disabled: dark ? #343e37 : #e7e9e4;
+    out property <color> disabled-ink: dark ? #b2bdb5 : #59665f;
+    out property <color> warning: dark ? #493327 : #f7e8dd;
+    out property <color> warning-ink: dark ? #ffcca7 : #773b21;
     in-out property <bool> reduced-motion: false;
+}
+
+export component SettingField inherits VerticalBox {
+    in property <string> label;
+    spacing: 6px;
+    padding: 0px;
+    horizontal-stretch: 1;
+    alignment: start;
+    Text { text: root.label; color: Theme.muted; font-size: 13px; height: 20px; }
+    Rectangle { height: 40px; min-width: 160px; background: Theme.surface;
+        border-width: 1px; border-color: Theme.field-border; border-radius: 5px;
+        HorizontalBox { padding: 2px; spacing: 0px; @children }
+    }
 }
 
 export component Action inherits Rectangle {
@@ -20,12 +44,12 @@ export component Action inherits Rectangle {
     horizontal-stretch: 0;
     height: 38px;
     border-radius: 5px;
-    background: !root.enabled ? #e7e9e4 : root.primary ? (touch.has-hover ? #163e34 : Theme.pine) : touch.has-hover ? #e8eee8 : Theme.surface;
+    background: !root.enabled ? Theme.disabled : root.primary ? (touch.has-hover ? #163e34 : Theme.pine) : touch.has-hover ? Theme.hover : Theme.surface;
     border-width: focus.has-focus ? 2px : 1px;
     border-color: focus.has-focus ? #4a8374 : root.primary ? Theme.pine : Theme.rule;
     animate background { duration: Theme.reduced-motion ? 0ms : 120ms; }
     caption := Text { text: root.label; horizontal-alignment: center; vertical-alignment: center;
-        color: !root.enabled ? #78837c : root.primary ? #ffffff : Theme.ink; font-size: 14px; font-weight: 600; }
+        color: !root.enabled ? Theme.disabled-ink : root.primary ? #ffffff : Theme.ink; font-size: 14px; font-weight: 600; }
     focus := FocusScope { enabled: root.enabled;
         key-pressed(e) => { if (e.text == "\n" || e.text == " ") { root.clicked(); return accept; } return reject; }
     }

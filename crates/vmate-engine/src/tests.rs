@@ -87,3 +87,17 @@ fn tray_is_opt_in_and_round_trips_without_breaking_old_preferences() {
         serde_json::from_slice(&serde_json::to_vec(&enabled).unwrap()).unwrap();
     assert!(loaded.tray_enabled);
 }
+
+#[test]
+fn country_lookup_defaults_on_and_saved_opt_out_is_preserved() {
+    let defaults: model::Preferences = serde_json::from_str("{}").unwrap();
+    assert!(defaults.country_lookup);
+    assert_eq!(defaults.appearance, model::Appearance::System);
+    let opt_out: model::Preferences =
+        serde_json::from_str(r#"{"country_lookup":false,"appearance":"dark"}"#).unwrap();
+    assert!(!opt_out.country_lookup);
+    assert_eq!(opt_out.appearance, model::Appearance::Dark);
+    let loaded: model::Preferences =
+        serde_json::from_slice(&serde_json::to_vec(&opt_out).unwrap()).unwrap();
+    assert_eq!(loaded.appearance, model::Appearance::Dark);
+}

@@ -165,3 +165,34 @@ content contains no window-drag region. Normal taskbar identity is unchanged.
   fits at 480px. The fixture banner exists only in deterministic capture mode.
 - GNOME/KDE tray rendering, Wayland and updated macOS interaction are not locally
   validated. The published desktop-v1.2.4-alpha.1 assets are not changed here.
+
+## Shared palette, aligned settings and relay countries
+
+Branch fix/desktop-theme-countries corrects the mixed custom-light/standard-dark
+palette that made inputs unreadable on dark desktops. Theme derives from the
+standard widget palette; System/Light/Dark selection previews and persists.
+SettingField supplies aligned labels, equal heights and visible control borders.
+The Settings form has a bounded width and explicit non-stretching vertical flow.
+
+- Reviewed actual light/dark Settings, bottom-of-scroll and narrow connected
+  captures. Country labels, field values and checkbox labels are readable.
+- Captures now cover 192 states: 24 scenarios, four widths and two palettes.
+- Actual rendered preset-input pixels meet at least 4.5:1 contrast in both
+  palettes at 480x600 and 1160x770 in the renderer regression test.
+- Default lookup uses the existing IpInfoGeoLocator, shared token/cache and
+  optional IPINFO_TOKEN override. Saved opt-outs remain preserved. Fixtures
+  explicitly disable external lookup; ordinary tests do not send relay IPs.
+- A real built-in public-relay engine probe tested 277, saved 35 successful
+  relays and resolved countries for all 35. Country breakdown: JP20, KR9,
+  HK1, ID1, NZ1, RU1, TH1, VN1. Export bytes verified; no tunnel tested.
+- CountryCode-to-name coverage checks every ISO entry. Home shows the known
+  connected relay country, never stale metadata after disconnect, and no
+  inferred location for unknown relays/external profiles.
+- Native X11 tests persist Dark through the real appearance selector and Save;
+  text/pointer/native-frame and disposable-host tray lifecycle checks still pass.
+- New ISO display dependency notices/source inventory includes 484 Linux crates.
+  No updated release, remote push, GNOME/KDE or Wayland validation is claimed.
+- Final local validation: 175 workspace Rust tests, 12 package tests, strict
+  all-targets/all-features workspace clippy, rustfmt, shape/dups, changed-file
+  comment/budget and diff guards passed. Final rebuilt binary regenerated all
+  192 captures and passed native pointer/theme-save and tray lifecycle tests.

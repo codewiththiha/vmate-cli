@@ -1,5 +1,5 @@
 import { VerticalBox, HorizontalBox, LineEdit, CheckBox, ComboBox, ScrollView } from "std-widgets.slint";
-import { Theme, Action, Rule } from "tokens.slint";
+import { Theme, Action, Rule, SettingField } from "tokens.slint";
 
 export component Settings inherits Rectangle {
     in property <bool> busy;
@@ -11,6 +11,7 @@ export component Settings inherits Rectangle {
     in-out property <int> editing;
     in-out property <int> scan-index;
     in-out property <int> connect-index;
+    in-out property <int> appearance;
     in-out property <string> name;
     in-out property <string> workers;
     in-out property <string> timeout;
@@ -22,37 +23,54 @@ export component Settings inherits Rectangle {
     callback save;
     background: Theme.paper;
     VerticalBox { padding: 0px; spacing: 0px;
-    ScrollView { content-y: root.review-scroll ? min(0px, self.height - self.content-height) : 0px; content-width: self.width - 12px;
-        VerticalBox { padding: 24px; spacing: 16px;
-            Text { text: "Settings"; color: Theme.ink; font-size: 24px; font-weight: 600; }
-            Text { text: "Scan presets"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-            ComboBox { model: root.names; current-index <=> root.editing; selected(index) => { root.select-preset(self.current-index); } }
-            LineEdit { text <=> root.name; placeholder-text: "Preset name · change to create a new preset"; }
-            HorizontalBox { spacing: 16px;
-                VerticalBox { spacing: 6px; Text { text: "Workers · 1–500"; color: Theme.muted; } LineEdit { text <=> root.workers; input-type: number; } }
-                VerticalBox { spacing: 6px; Text { text: "Timeout · 1–120 s"; color: Theme.muted; } LineEdit { text <=> root.timeout; input-type: number; } }
+        ScrollView { content-y: root.review-scroll ? min(0px, self.height - self.content-height) : 0px; content-width: self.width - 12px;
+            HorizontalBox { padding: 24px; spacing: 0px; alignment: start;
+                VerticalBox { padding: 0px; spacing: 16px; alignment: start; max-width: 720px; horizontal-stretch: 1;
+                    Text { text: "Settings"; color: Theme.ink; font-size: 24px; font-weight: 600; }
+                    SettingField { label: "Appearance";
+                        ComboBox { model: ["System", "Light", "Dark"]; current-index <=> root.appearance; }
+                    }
+                    CheckBox { text: "Reduce motion"; checked <=> root.reduced; }
+                    Rule {}
+                    Text { text: "Scan presets"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                    SettingField { label: "Edit preset";
+                        ComboBox { model: root.names; current-index <=> root.editing; selected(index) => { root.select-preset(self.current-index); } }
+                    }
+                    SettingField { label: "Preset name · change to create a new preset";
+                        LineEdit { text <=> root.name; }
+                    }
+                    HorizontalBox { padding: 0px; spacing: 16px;
+                        SettingField { label: "Workers · 1–500"; LineEdit { text <=> root.workers; input-type: number; } }
+                        SettingField { label: "Timeout · 1–120 seconds"; LineEdit { text <=> root.timeout; input-type: number; } }
+                    }
+                    Rule {}
+                    Text { text: "Action assignments"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                    HorizontalBox { padding: 0px; spacing: 16px;
+                        SettingField { label: "Scan preset"; ComboBox { model: root.names; current-index <=> root.scan-index; } }
+                        SettingField { label: "Connect preset"; ComboBox { model: root.names; current-index <=> root.connect-index; } }
+                    }
+                    Text { text: "Save a new preset before assigning it."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                    Rule {}
+                    Text { text: "Connection"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                    CheckBox { text: "Auto-reconnect"; checked <=> root.auto-reconnect; }
+                    SettingField { label: "Rescan loop limit · 1–20";
+                        LineEdit { text <=> root.retry-limit; input-type: number; }
+                    }
+                    Rule {}
+                    Text { text: "Country lookup"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                    CheckBox { text: "Look up relay countries with ipinfo.io"; checked <=> root.lookup; }
+                    Text { text: "On by default. Uses the built-in token and cached results. Sends relay IPs to ipinfo.io; disable to opt out. Rescan to resolve older unknown entries."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                    if !root.mac: Rule {}
+                    if !root.mac: Text { text: "System tray"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                    if !root.mac: CheckBox { text: "Show tray icon · close window to tray"; checked <=> root.tray-enabled; }
+                    if !root.mac: Text { text: root.tray-active ? "Tray ready. Its menu can reopen or quit vmate." : "Requires a StatusNotifier/AppIndicator host. Without one, closing exits."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                }
             }
-            Rule {}
-            Text { text: "Action assignments"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-            HorizontalBox { spacing: 16px;
-                VerticalBox { spacing: 6px; Text { text: "Scan"; color: Theme.muted; } ComboBox { model: root.names; current-index <=> root.scan-index; } }
-                VerticalBox { spacing: 6px; Text { text: "Connect"; color: Theme.muted; } ComboBox { model: root.names; current-index <=> root.connect-index; } }
-            }
-            Text { text: "Save a new preset before assigning it."; color: Theme.muted; font-size: 12px; }
-            Rule {}
-            CheckBox { text: "Auto-reconnect"; checked <=> root.auto-reconnect; }
-            HorizontalBox { spacing: 16px;
-                Text { text: "Rescan loop limit · 1–20"; color: Theme.ink; vertical-alignment: center; }
-                LineEdit { text <=> root.retry-limit; input-type: number; max-width: 90px; }
-            }
-            if !root.mac: CheckBox { text: "Show system tray icon · close window to tray"; checked <=> root.tray-enabled; }
-            if !root.mac: Text { text: root.tray-active ? "Tray ready. Use its menu to reopen or quit vmate." : "Requires a desktop StatusNotifier/AppIndicator host. Without one, closing exits."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-            CheckBox { text: "Reduce motion"; checked <=> root.reduced; }
-            CheckBox { text: "Look up relay countries with ipinfo.io"; checked <=> root.lookup; }
-            Text { text: "Country lookup sends relay IPs to ipinfo.io."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-
         }
-    }
-    HorizontalBox { padding: 20px; Action { label: "Save settings"; primary: true; enabled: !root.busy; clicked => { root.save(); } } Rectangle { horizontal-stretch: 1; } }
+        Rule {}
+        HorizontalBox { padding: 20px; spacing: 12px;
+            Action { label: "Save settings"; primary: true; enabled: !root.busy; clicked => { root.save(); } }
+            Text { text: root.busy ? "Available after the current operation stops." : "Appearance previews immediately. Save to keep changes."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+        }
     }
 }

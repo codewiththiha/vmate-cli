@@ -57,7 +57,7 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
 pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
     app.set_busy(snapshot.busy);
     app.set_connected(snapshot.connected);
-    app.set_status(snapshot.status.clone().into());
+    app.set_status(crate::country::status(snapshot).into());
     app.set_message(snapshot.message.clone().into());
     app.set_diagnostic(snapshot.error.clone().into());
     app.set_completed(snapshot.completed as i32);
@@ -73,13 +73,18 @@ pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
         .relays
         .iter()
         .filter(|r| {
-            format!("{} {}", r.name, r.country)
-                .to_lowercase()
-                .contains(&app.get_query().to_lowercase())
+            format!(
+                "{} {} {}",
+                r.name,
+                r.country,
+                crate::country::name(&r.country).unwrap_or("")
+            )
+            .to_lowercase()
+            .contains(&app.get_query().to_lowercase())
         })
         .map(|r| RelayRow {
             name: r.name.clone().into(),
-            country: r.country.clone().into(),
+            country: crate::country::name(&r.country).unwrap_or("UNKNOWN").into(),
             checked: r.checked.clone().into(),
             path: r.path.to_string_lossy().to_string().into(),
         })

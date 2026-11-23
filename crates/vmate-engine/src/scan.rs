@@ -30,7 +30,10 @@ pub(super) async fn with_preset(port: &Port, preset: &crate::model::ScanPreset) 
     let pool = vmate_core::db::init_pool(&port.configuration.database).await?;
     let repo = Arc::new(ConfigRepo::new(pool));
     let geo: Arc<dyn GeoLocator> = if preferences.country_lookup {
-        Arc::new(IpInfoGeoLocator::new(repo.clone(), None))
+        Arc::new(IpInfoGeoLocator::new(
+            repo.clone(),
+            std::env::var("IPINFO_TOKEN").ok(),
+        ))
     } else {
         Arc::new(PrivateGeo)
     };

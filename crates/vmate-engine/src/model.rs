@@ -32,6 +32,8 @@ pub struct Preferences {
     pub country_lookup: bool,
     /// Opt-in desktop system tray; older preferences default to disabled.
     pub tray_enabled: bool,
+    /// System, light or dark presentation; no effect on networking.
+    pub appearance: Appearance,
 }
 
 impl Default for Preferences {
@@ -43,8 +45,9 @@ impl Default for Preferences {
             auto_reconnect: false,
             retry_limit: 3,
             reduced_motion: false,
-            country_lookup: false,
+            country_lookup: true,
             tray_enabled: false,
+            appearance: Appearance::System,
         }
     }
 }
@@ -57,6 +60,7 @@ pub struct Snapshot {
     pub error: String,
     pub busy: bool,
     pub connected: bool,
+    pub connected_country: String,
     pub completed: usize,
     pub total: usize,
     pub relays: Vec<Relay>,
@@ -75,6 +79,7 @@ impl Default for Snapshot {
             error: String::new(),
             busy: false,
             connected: false,
+            connected_country: String::new(),
             completed: 0,
             total: 0,
             relays: Vec::new(),
@@ -115,4 +120,14 @@ impl Default for ScanPreset {
             timeout: 5,
         }
     }
+}
+
+/// Persisted color preference independent of the GUI toolkit.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Appearance {
+    #[default]
+    System,
+    Light,
+    Dark,
 }

@@ -57,6 +57,13 @@ pub(super) fn check(
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(!port.snapshot().events.is_empty());
+    let mut preferences = port.snapshot().preferences;
+    preferences.country_lookup = false;
+    port.send(vmate_engine::model::Command::Save(preferences))
+        .unwrap();
+    while port.snapshot().busy && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
     for mac in [false, true] {
         app.set_mac(mac);
         exercise_scan(app, &port, window, pixels, click);
