@@ -59,6 +59,9 @@ pub struct Snapshot {
     pub message: String,
     pub error: String,
     pub busy: bool,
+    pub saving: bool,
+    pub exporting: bool,
+    pub ready: bool,
     pub connected: bool,
     pub connected_country: String,
     pub completed: usize,
@@ -78,6 +81,9 @@ impl Default for Snapshot {
             message: "Scan for relays, then connect through your system VPN service.".into(),
             error: String::new(),
             busy: false,
+            saving: false,
+            exporting: false,
+            ready: false,
             connected: false,
             connected_country: String::new(),
             completed: 0,
@@ -98,10 +104,21 @@ pub enum Command {
     AutoConnect,
     Refresh,
     Scan,
-    LookupCountry { path: PathBuf },
+    LookupCountry {
+        path: PathBuf,
+    },
     Connect(String),
-    Export { path: PathBuf, destination: PathBuf },
-    Import { path: PathBuf },
+    Export {
+        path: PathBuf,
+        destination: PathBuf,
+    },
+    ExportBatch {
+        items: Vec<ExportItem>,
+        directory: PathBuf,
+    },
+    Import {
+        path: PathBuf,
+    },
     Save(Preferences),
 }
 
@@ -131,4 +148,11 @@ pub enum Appearance {
     System,
     Light,
     Dark,
+}
+
+/// One explicitly selected relay and its previewed destination filename.
+#[derive(Clone, Debug)]
+pub struct ExportItem {
+    pub path: PathBuf,
+    pub filename: String,
 }

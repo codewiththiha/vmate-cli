@@ -97,12 +97,7 @@ pub(super) fn export(port: &Port, path: PathBuf, destination: PathBuf) -> Result
     if destination.exists() {
         bail!("Choose a new filename; existing files are never overwritten.");
     }
-    let mut source = std::fs::File::open(&relay.path)?;
-    let mut target = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&destination)?;
-    std::io::copy(&mut source, &mut target)?;
+    crate::export::copy_new(&relay.path, &destination)?;
     let mut state = port.state.lock().unwrap();
     state.snapshot.message = format!("Exported {}", destination.display());
     state.event(format!("Config exported to {}", destination.display()));
@@ -141,7 +136,9 @@ pub(super) fn save(port: &Port, preferences: Preferences) -> Result<()> {
     std::fs::write(path, serde_json::to_vec_pretty(&preferences)?)?;
     let mut state = port.state.lock().unwrap();
     state.snapshot.preferences = preferences;
-    state.snapshot.message = "Preferences saved. Applied to your next scan.".into();
+    if !state.snapshot.busy {
+        state.snapshot.message = "Preferences saved. Applied to your next scan.".into();
+    }
     Ok(())
 }
 

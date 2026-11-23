@@ -8,7 +8,9 @@ use vmate_engine::{Configuration, Engine, Port, model::Command};
 
 fn wait(port: &Port, condition: impl Fn() -> bool) {
     let deadline = Instant::now() + Duration::from_secs(15);
-    while !condition() && Instant::now() < deadline {
+    while (!condition() || port.snapshot().saving || port.snapshot().exporting)
+        && Instant::now() < deadline
+    {
         std::thread::sleep(Duration::from_millis(10));
     }
     assert!(condition(), "engine state: {:?}", port.snapshot());
@@ -103,5 +105,30 @@ fn rescan_limit_saves_and_reloads_from_settings() {
                 .unwrap();
         assert_eq!(saved.retry_limit, limit);
     }
+    drop(engine);
+}
+
+#[test]
+fn settings_save_does_not_cancel_or_wait_for_active_scan() {
+    let (dir, engine, port) = start_engine("sleep 30");
+    port.send(Command::Scan).unwrap();
+    wait(&port, || port.snapshot().total == 277);
+    let mut preferences = port.snapshot().preferences;
+    preferences.tray_enabled = true;
+    preferences.retry_limit = 7;
+    port.send(Command::Save(preferences)).unwrap();
+    wait(&port, || !port.snapshot().saving);
+    assert!(
+        port.snapshot().busy,
+        "Save must not complete the active operation"
+    );
+    assert_eq!(port.snapshot().preferences.retry_limit, 7);
+    assert!(port.snapshot().preferences.tray_enabled);
+    let saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(dir.path().join("config/desktop.json")).unwrap())
+            .unwrap();
+    assert_eq!(saved["tray_enabled"], true);
+    port.cancel();
+    wait(&port, || !port.snapshot().busy);
     drop(engine);
 }

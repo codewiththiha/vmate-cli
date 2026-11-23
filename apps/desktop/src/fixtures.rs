@@ -5,6 +5,9 @@ use vmate_engine::model::{Profile, Relay, Snapshot};
 
 pub(super) const SCENARIOS: &[&str] = &[
     "preferences-bottom",
+    "preferences-presets",
+    "preferences-connection",
+    "relay-export",
     "home-idle",
     "home-scanning",
     "home-connecting",
@@ -83,6 +86,8 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
         ],
         ..Snapshot::default()
     };
+    app.set_export_open(false);
+    app.set_settings_page(0);
     app.set_review_scroll(false);
     app.set_query("".into());
     app.set_mac(false);
@@ -101,6 +106,9 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
     }
     select_scenario(app, scenario, &mut snapshot);
     binding::apply(app, &snapshot);
+    if scenario == "relay-export" {
+        export_dialog(app);
+    }
     if !snapshot.relays.is_empty() {
         app.set_selected(0);
     }
@@ -159,6 +167,15 @@ fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
         }
         "activity" => app.set_page(3),
         "preferences" => app.set_page(4),
+        "preferences-presets" => {
+            app.set_page(4);
+            app.set_settings_page(1);
+        }
+        "preferences-connection" => {
+            app.set_page(4);
+            app.set_settings_page(2);
+        }
+        "relay-export" => {}
         "preferences-bottom" => {
             app.set_page(4);
             app.set_review_scroll(true);
@@ -204,4 +221,13 @@ fn home(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
         }
         _ => {}
     }
+}
+
+fn export_dialog(app: &AppWindow) {
+    app.set_export_rows(app.get_relays());
+    app.set_export_directory("/home/user/Downloads".into());
+    app.set_export_preview(
+        "public-vpn-249.opengw.net_JP.ovpn\nvpn126573544.opengw.net_KR.ovpn".into(),
+    );
+    app.set_export_open(true);
 }

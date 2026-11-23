@@ -1,0 +1,44 @@
+import { VerticalBox, HorizontalBox, ComboBox, CheckBox, LineEdit } from "std-widgets.slint";
+import { Theme, Action, Rule, SettingField } from "tokens.slint";
+
+export component ExportDialog inherits Rectangle {
+    in property <int> count;
+    in-out property <string> directory;
+    in-out property <int> style;
+    in-out property <bool> full-country;
+    in property <string> preview;
+    in property <string> error;
+    callback choose-folder;
+    callback confirm;
+    callback cancel;
+    background: #0008;
+    FocusScope { width: root.width; height: root.height; init => { self.focus(); }
+        key-pressed(e) => { if e.text == Key.Escape { root.cancel(); return accept; } return reject; }
+    TouchArea {}
+    Rectangle { width: min(500px, parent.width - 32px); height: min(550px, parent.height - 32px);
+        x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2;
+        background: Theme.paper; border-radius: 8px; border-width: 1px; border-color: Theme.rule;
+        VerticalBox { padding: 24px; spacing: 14px;
+            Text { text: "Export " + root.count + (root.count == 1 ? " relay" : " relays"); color: Theme.ink; font-size: 22px; font-weight: 600; }
+            Text { text: "Save OpenVPN configs. Existing files are never overwritten."; color: Theme.muted; wrap: word-wrap; font-size: 13px; }
+            SettingField { label: "Destination folder"; LineEdit { text <=> root.directory; placeholder-text: "Choose a folder…"; } }
+            Action { label: "Choose folder…"; clicked => { root.choose-folder(); } }
+            SettingField { label: "Filename style";
+                ComboBox { model: ["Relay name", "Country", "Relay name + country"]; current-index <=> root.style; }
+            }
+            CheckBox { text: "Full country names · japan instead of JP"; checked <=> root.full-country; enabled: root.style != 0; }
+            Rule {}
+            Text { text: "FILENAME PREVIEW"; color: Theme.muted; font-size: 11px; }
+            Text { text: root.preview; color: Theme.ink; font-family: "monospace"; font-size: 12px; overflow: elide; }
+            Text { text: "Duplicates receive _1, _2, … Unknown countries use UNKNOWN (unknown with full names)."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+            if root.error != "": Text { text: root.error; color: Theme.warning-ink; wrap: word-wrap; font-size: 12px; }
+            Rectangle { vertical-stretch: 1; }
+            HorizontalBox { spacing: 12px;
+                Rectangle { horizontal-stretch: 1; }
+                Action { label: "Cancel"; clicked => { root.cancel(); } }
+                Action { label: "Export"; primary: true; enabled: root.directory != ""; clicked => { root.confirm(); } }
+            }
+        }
+    }
+    }
+}

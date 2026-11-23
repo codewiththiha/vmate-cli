@@ -3,6 +3,7 @@ import { Theme, Action, Rule, SectionTitle } from "tokens.slint";
 import { RelayList, RelayRow } from "relay-list.slint";
 import { Connections, ProfileRow, Setup } from "pages.slint";
 import { Settings } from "settings.slint";
+import { ExportDialog } from "export-dialog.slint";
 import { Home } from "home.slint";
 export { RelayRow, ProfileRow }
 
@@ -27,6 +28,23 @@ export component AppWindow inherits Window {
     in property <int> completed;
     in property <int> total;
     in property <[RelayRow]> relays;
+    in-out property <bool> selection-mode;
+    in property <int> selected-count;
+    callback toggle-relay(int);
+    callback select-all-relays(bool);
+    in property <bool> exporting;
+    in-out property <bool> export-open;
+    in property <[RelayRow]> export-rows;
+    in-out property <string> export-directory;
+    in-out property <int> export-style: 2;
+    in-out property <bool> export-full-country;
+    in property <string> export-preview;
+    in property <string> export-error;
+    callback preview-export;
+    callback choose-export-folder;
+    callback confirm-export;
+    changed export-style => { root.preview-export(); }
+    changed export-full-country => { root.preview-export(); }
     in property <[ProfileRow]> profiles;
     in property <string> status: "Not connected";
     in property <string> message: "Ready when you are. Your system network is unchanged.";
@@ -50,6 +68,13 @@ export component AppWindow inherits Window {
     in-out property <int> scan-index;
     in-out property <int> connect-index;
     in-out property <string> preset-name: "Default";
+    in-out property <int> settings-page: 0;
+    in property <bool> settings-dirty: false;
+    in property <bool> settings-valid: true;
+    in property <bool> settings-saving: false;
+    in property <string> settings-feedback: "All changes saved";
+    callback new-preset;
+    callback discard-settings;
     callback select-preset(int);
     callback auto-connect;
     callback scan;
@@ -65,6 +90,7 @@ export component AppWindow inherits Window {
     in-out property <bool> tray-enabled: false;
     in property <bool> tray-active: false;
     changed reduced => { Theme.reduced-motion = root.reduced; }
+    FocusScope { enabled: !root.export-open; width: root.width; height: root.height;
     VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; spacing: 0px; padding: 0px;
         if root.fixture: Rectangle { height: 26px; background: #f0e6cb;
             Text { text: "DESIGN REVIEW FIXTURE · No live network operation"; color: #654b1d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
@@ -109,7 +135,8 @@ export component AppWindow inherits Window {
                     stopping: root.stopping;
                     connect => { root.auto-connect(); } cancel => { root.cancel(); }
                 }
-                if root.page == 0: RelayList { review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy && root.status == "Scanning"; operation-blocked: root.busy;
+                if root.page == 0: RelayList { selection-mode: root.selection-mode; selected-count: root.selected-count; exporting: root.exporting; notice: root.message;
+                    toggle-relay(index) => { root.toggle-relay(index); } select-all-relays(value) => { root.select-all-relays(value); } review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy && root.status == "Scanning"; operation-blocked: root.busy;
                     completed: root.completed; total: root.total;
                     scan => { root.scan(); } cancel => { root.cancel(); }
                     lookup-country(path) => { root.lookup-country(path); }
@@ -150,8 +177,9 @@ export component AppWindow inherits Window {
                         Rectangle { vertical-stretch: 1; }
                     }
                 } }
-                if root.page == 4: Settings { appearance <=> root.appearance; mac: root.mac; tray-enabled <=> root.tray-enabled; tray-active: root.tray-active; review-scroll: root.review-scroll;
-                    names: root.preset-names; editing <=> root.editing-preset;
+                if root.page == 4: Settings { page <=> root.settings-page; appearance <=> root.appearance; mac: root.mac; tray-enabled <=> root.tray-enabled; tray-active: root.tray-active; review-scroll: root.review-scroll;
+                    dirty: root.settings-dirty; valid: root.settings-valid; saving: root.settings-saving; feedback: root.settings-feedback;
+                    discard => { root.discard-settings(); } new-preset => { root.new-preset(); } names: root.preset-names; editing <=> root.editing-preset;
                     name <=> root.preset-name; scan-index <=> root.scan-index; connect-index <=> root.connect-index;
                     select-preset(index) => { root.select-preset(index); } auto-reconnect <=> root.auto-reconnect; retry-limit <=> root.retry-limit; busy: root.busy; workers <=> root.workers; timeout <=> root.timeout; reduced <=> root.reduced; lookup <=> root.lookup; save => { root.save(); } }
                 Rule {}
@@ -165,4 +193,12 @@ export component AppWindow inherits Window {
             Action { label: "Settings"; primary: root.page == 4; clicked => { root.page = 4; } }
         }
     }
+    }
+    if root.export-open: ExportDialog { x: 0px; y: 0px; width: root.width; height: root.height;
+        count: root.export-rows.length; directory <=> root.export-directory; style <=> root.export-style;
+        full-country <=> root.export-full-country; preview: root.export-preview; error: root.export-error;
+        choose-folder => { root.choose-export-folder(); } confirm => { root.confirm-export(); }
+        cancel => { root.export-open = false; }
+    }
+
 }

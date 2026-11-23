@@ -23,13 +23,14 @@ Launch vmate from the desktop application menu; pin it to the taskbar if wanted.
 The system owns the title bar, resize borders and window controls. There is no
 extra in-window menu strip or client-area window-drag handler.
 
-Settings → Show system tray icon is off by default. Save to enable it. With an
+Settings → General → Show tray icon is off by default. Save to enable it. With an
 available StatusNotifier/AppIndicator host, closing hides only the window; scans
 or connections continue. Click the tray icon or choose Open vmate to return.
-Its menu also offers Settings and Quit vmate. Quit cancels owned work and exits.
-Disabling the setting unregisters the icon. Without a working tray host, closing
-exits normally; loss of the host reopens the window so vmate cannot become hidden
-and unreachable. GNOME may require an AppIndicator extension; KDE usually has a
+Its menu offers Connect, Disconnect/Stop, Settings and Quit vmate.
+Quit cancels owned work and exits; opening the window never reconnects the VPN.
+Disabling and saving unregisters the icon. With tray mode enabled but no working
+host, closing keeps the window visible with a recovery message instead of exiting.
+Loss of the host reopens the window so vmate cannot become hidden and unreachable. GNOME may require an AppIndicator extension; KDE usually has a
 host. This does not control normal taskbar visibility or install an autostart job.
 
 Setup detects Arch/Manjaro, Fedora and Debian-family package instructions.
@@ -104,3 +105,21 @@ integration, X11/XCB, Xcursor, Xrandr, Xi and Wayland client libraries. Prefer
 the .deb on Ubuntu 24.04+ to resolve these automatically. On Arch/Manjaro,
 install libxkbcommon-x11, libx11, libxcb, libxcursor, libxrandr, libxi and
 fontconfig. The tar package does not claim to be a self-contained AppImage.
+
+## Settings and selected exports
+
+Settings has General, Presets and Connection sections with a pinned Save action.
+New preset creates a separate editable entry; names must be unique. Assign a new
+preset to Scan or Connect before saving. Save and Discard report draft state;
+valid preferences can be saved during a scan or connection without stopping it.
+Connection settings apply to the next workflow, not an already running one.
+
+Right-click or hold a relay to select it. Select all applies to the visible,
+filtered list; Clear leaves selection mode. Changing a filter drops selections
+that are no longer visible. Export opens a dialog for the destination folder and
+filename style: relay name, country code, or name_code. Full country names changes
+JP to japan, and name_JP to name_japan; it has no effect on name-only exports.
+Unknown countries use UNKNOWN/unknown. The preview shows up to three base names.
+Collisions receive numbered suffixes; existing files are never overwritten.
+Batch export does not interrupt an active VPN. A failed batch reports how many
+files were written; files already exported are retained.

@@ -1,11 +1,17 @@
 import { VerticalBox, HorizontalBox, LineEdit, ScrollView } from "std-widgets.slint";
 import { Theme, Action, Rule, SectionTitle } from "tokens.slint";
-export struct RelayRow { name: string, country: string, checked: string, path: string }
+export struct RelayRow { name: string, country: string, checked: string, path: string, code: string, marked: bool }
 
 export component RelayList inherits Rectangle {
     in property <[RelayRow]> rows;
     in property <bool> review-scroll: false;
     in-out property <int> selected: -1;
+    in property <bool> exporting;
+    in property <bool> selection-mode;
+    in property <int> selected-count;
+    in property <string> notice;
+    callback toggle-relay(int);
+    callback select-all-relays(bool);
     in property <bool> busy;
     in property <bool> operation-blocked;
     in-out property <string> query;
@@ -26,12 +32,18 @@ export component RelayList inherits Rectangle {
             }
         }
         Text { text: root.busy ? "Checking relays · " + root.completed + " / " + root.total : root.rows.length + " saved relays"; color: Theme.muted; font-size: 13px; }
+        HorizontalBox { spacing: 8px;
+            Action { label: "Select all"; enabled: root.rows.length > 0; clicked => { root.select-all-relays(true); } }
+            if root.selection-mode: Action { label: "Clear"; clicked => { root.select-all-relays(false); } }
+            Text { text: root.selected-count > 0 ? root.selected-count + " selected" : "Right-click or hold to select"; color: Theme.muted; font-size: 12px; wrap: word-wrap; vertical-alignment: center; }
+        }
         LineEdit { text <=> root.query; placeholder-text: "Search relays"; height: 36px; }
         if root.rows.length == 0: Text { text: root.query == "" ? "No saved relays. Connect from Home to find one." : "No matching relays"; color: Theme.muted; wrap: word-wrap; vertical-stretch: 1; }
                 if root.rows.length > 0: ScrollView { content-width: self.width - 12px;
                     VerticalBox { spacing: 0px; padding: 0px;
-                        for row[index] in root.rows: Rectangle { height: 73px; background: root.selected == index ? Theme.tint : hit.has-hover ? Theme.hover : Theme.paper;
+                        for row[index] in root.rows: Rectangle { height: 73px; background: row.marked || root.selected == index ? Theme.tint : hit.has-hover ? Theme.hover : Theme.paper;
                             HorizontalBox { padding-left: 12px; padding-right: 12px; spacing: 12px;
+                                if root.selection-mode: Text { text: row.marked ? "☑" : "☐"; color: Theme.pine; font-size: 22px; vertical-alignment: center; width: 26px; }
                                 VerticalBox { alignment: center; spacing: 5px;
                                     Text { text: row.name; color: Theme.ink; font-size: 14px; font-weight: 600; overflow: elide; }
                                     Text { text: row.checked; color: Theme.muted; font-size: 12px; overflow: elide; }
@@ -40,16 +52,29 @@ export component RelayList inherits Rectangle {
                             }
                             Rectangle { y: parent.height - 1px; height: 1px; width: parent.width; background: Theme.rule; }
                             focus := FocusScope {
-                                key-pressed(e) => { if e.text == "\n" || e.text == " " { root.selected = index; return accept; } return reject; }
+                                key-pressed(e) => { if e.text == "\n" || e.text == " " { if root.selection-mode { root.toggle-relay(index); } else { root.selected = index; } return accept; } return reject; }
                             }
                             border-width: focus.has-focus ? 2px : 0px;
                             border-color: Theme.pine;
-                            hit := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.selected = index; } }
+                            property <bool> held: false;
+                            hold := Timer { interval: 550ms; running: false;
+                                triggered => { self.running = false; parent.held = true; root.toggle-relay(index); }
+                            }
+                            hit := TouchArea { mouse-cursor: pointer;
+                                pointer-event(e) => {
+                                    if e.button == PointerEventButton.left && e.kind == PointerEventKind.down { parent.held = false; hold.running = true; }
+                                    if e.kind == PointerEventKind.up || e.kind == PointerEventKind.cancel { hold.running = false; }
+                                }
+                                moved => { hold.running = false; }
+                                clicked => { focus.focus(); if !parent.held { if root.selection-mode { root.toggle-relay(index); } else { root.selected = index; } } }
+                            }
                             ContextMenuArea {
-                                enabled: !root.operation-blocked;
                                 Menu {
+                                    MenuItem { title: row.marked ? "Deselect" : "Select"; activated => { root.toggle-relay(index); } }
+                                    MenuItem { title: "Select all shown"; activated => { root.select-all-relays(true); } }
+                                    MenuItem { title: "Clear selection"; enabled: root.selected-count > 0; activated => { root.select-all-relays(false); } }
                                     if row.country == "" || row.country == "UNKNOWN": MenuItem {
-                                        title: "Look up country now";
+                                        title: "Look up country now"; enabled: !root.operation-blocked;
                                         activated => { root.lookup-country(row.path); }
                                     }
                                 }
@@ -59,12 +84,13 @@ export component RelayList inherits Rectangle {
                     }
                 }
 
+        Text { text: root.notice; color: Theme.muted; font-size: 12px; wrap: word-wrap; max-height: 38px; overflow: elide; }
         Rule {}
         if root.width >= 600px: Text { text: root.selected >= 0 ? root.rows[root.selected].path : "Select a relay";
             color: Theme.muted; font-size: 12px; overflow: elide; }
         HorizontalBox { spacing: 12px;
             Action { label: "Import"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
-            Action { label: "Export…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
+            Action { label: root.exporting ? "Exporting…" : root.selected-count > 0 ? "Export " + root.selected-count + "…" : "Export…"; enabled: (root.selected-count > 0 || root.selected >= 0) && !root.exporting; clicked => { root.export-relay(); } }
             Rectangle { horizontal-stretch: 1; }
         }
     }

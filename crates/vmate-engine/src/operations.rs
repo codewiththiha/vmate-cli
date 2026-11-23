@@ -1,4 +1,4 @@
-//! Serialize application operations and retain useful failure diagnostics.
+//! Interleave settings and export work with one owned VPN operation.
 
 mod history;
 
@@ -11,6 +11,7 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
     if let Err(error) = platform::refresh(&port).await {
         fail(&port, error);
     }
+    port.state.lock().unwrap().snapshot.ready = true;
     let pool = match vmate_core::db::init_pool(&port.configuration.database).await {
         Ok(pool) => pool,
         Err(error) => {
@@ -26,6 +27,9 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
             _ = port.shutdown.cancelled() => break,
             command = receiver.recv() => match command { Some(c) => c, None => break },
         };
+        let Some(command) = maintenance(&port, command) else {
+            continue;
+        };
         {
             let mut state = port.state.lock().unwrap();
             state.snapshot.busy = true;
@@ -34,7 +38,7 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
         }
         let managed = matches!(&command, Command::Connect(_));
         let automatic = matches!(&command, Command::AutoConnect);
-        let result = execute(&port, command).await;
+        let result = active(&port, &mut receiver, command).await;
         let uncertain = result.is_err()
             && (managed || (automatic && port.snapshot().status == "Check system VPN"));
         if let Err(error) = result {
@@ -73,16 +77,54 @@ async fn execute(port: &Port, command: Command) -> Result<()> {
             let cancel = port.state.lock().unwrap().operation.clone();
             vmate_core::managed::run(&uuid, &mut Host(port.clone()), cancel).await
         }
-        Command::Export { path, destination } => platform::export(port, path, destination),
         Command::Import { path } => platform::import(port, path).await,
-        Command::Save(preferences) => platform::save(port, preferences),
+        Command::Save(_) | Command::Export { .. } | Command::ExportBatch { .. } => {
+            anyhow::bail!("Settings and export work must use the maintenance dispatcher")
+        }
     }
 }
 
 fn fail(port: &Port, error: anyhow::Error) {
     let mut state = port.state.lock().unwrap();
-    let text = format!("{error:#}");
-    state.snapshot.error = text.chars().take(8192).collect();
+    state.diagnose(error);
     state.snapshot.message = "The operation stopped. Review the diagnostic before retrying.".into();
-    state.event(text);
+}
+
+async fn active(
+    port: &Port,
+    receiver: &mut mpsc::Receiver<Command>,
+    command: Command,
+) -> Result<()> {
+    let operation = execute(port, command);
+    tokio::pin!(operation);
+    loop {
+        tokio::select! {
+            biased;
+            result = &mut operation => return result,
+            Some(command) = receiver.recv() => {
+                if maintenance(port, command).is_some() { anyhow::bail!("Unexpected concurrent VPN command"); }
+            }
+        }
+    }
+}
+
+fn maintenance(port: &Port, command: Command) -> Option<Command> {
+    let (result, saving) = match command {
+        Command::Save(preferences) => (platform::save(port, preferences), true),
+        Command::Export { path, destination } => (platform::export(port, path, destination), false),
+        Command::ExportBatch { items, directory } => {
+            (crate::export::batch(port, items, &directory), false)
+        }
+        other => return Some(other),
+    };
+    let mut state = port.state.lock().unwrap();
+    if let Err(error) = result {
+        state.diagnose(error);
+    }
+    if saving {
+        state.snapshot.saving = false;
+    } else {
+        state.snapshot.exporting = false;
+    }
+    None
 }

@@ -12,7 +12,7 @@ pub(super) fn check(
         app.window().set_size(PhysicalSize::new(width, height));
         for appearance in [1, 2] {
             app.set_appearance(appearance);
-            fixtures::apply(app, "preferences");
+            fixtures::apply(app, "preferences-presets");
             slint::platform::update_timers_and_animations();
             app.window().request_redraw();
             window.draw_if_needed(|renderer| {
@@ -20,9 +20,9 @@ pub(super) fn check(
             });
             assert_eq!(app.get_dark_mode(), appearance == 2);
             let left = if width < 760 { 40 } else { 192 };
-            let field = pixels[398 * width as usize + left + 200];
+            let field = pixels[350 * width as usize + left + 200];
             let background = luminance(field);
-            let ink: Vec<_> = (390..405)
+            let ink: Vec<_> = (342..357)
                 .flat_map(|y| (left + 14..left + 90).map(move |x| y * width as usize + x))
                 .map(|offset| luminance(pixels[offset]))
                 .collect();

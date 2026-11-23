@@ -110,3 +110,14 @@ feature test modules until there are two real cross-feature callers.
 - `ConfigRepo::update_country`: metadata-only update, preserving success history.
 - `tools/managed_smoke.py`: isolated nmcli fixture for slow-down-command and
   external-disconnect contracts; never a substitute for real VPN validation.
+
+- `binding/settings.rs::Session`: one frontend draft with explicit preset
+  creation, staged edits, dirty/validation feedback and discard-to-saved behavior.
+- `operations.rs::maintenance`: bounded queued saves/exports interleaved with
+  the owned VPN future; neither resets its cancellation token nor ends a session.
+- `vmate-engine/src/export.rs`: shared preview naming, bounded collision retries
+  and create-new copies with failed-output cleanup; single exports reuse copying.
+- `binding/relays.rs`: path-backed visible multi-selection and export intent;
+  filename generation stays toolkit-neutral in the engine.
+- `tools/tray_session_smoke.py`: real window/tray input with isolated NM commands;
+  asserts close/save/export preserve a managed fixture, not real VPN connectivity.

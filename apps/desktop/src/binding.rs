@@ -4,6 +4,7 @@ use crate::{AppWindow, ProfileRow, RelayRow};
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::time::Duration;
 mod actions;
+mod relays;
 mod settings;
 
 use vmate_engine::{Port, model::Snapshot};
@@ -21,29 +22,29 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
     });
     let closing = actions::closing(app, &port);
     #[cfg(target_os = "linux")]
-    let mut tray = crate::tray::Session::new(app.as_weak());
+    let mut tray = crate::tray::Session::new(app.as_weak(), port.clone());
     let weak = app.as_weak();
     let timer = slint::Timer::default();
     let mut previous = String::new();
-    let mut preferences = String::new();
+    let mut settings = settings::Session::bind(app, &port);
     timer.start(
         slint::TimerMode::Repeated,
         Duration::from_millis(100),
         move || {
             let Some(app) = weak.upgrade() else { return };
             let snapshot = port.snapshot();
-            if (closing.get() || port.is_shutting_down()) && !snapshot.busy {
+            if (closing.get() || port.is_shutting_down())
+                && !snapshot.busy
+                && !snapshot.saving
+                && !snapshot.exporting
+            {
                 let _ = app.hide();
                 let _ = slint::quit_event_loop();
                 return;
             }
-            let preference_key = format!("{:?}", snapshot.preferences);
-            if preference_key != preferences {
-                settings::apply(&app, &snapshot.preferences);
-                preferences = preference_key;
-            }
+            settings.tick(&app, &snapshot);
             #[cfg(target_os = "linux")]
-            tray.set_enabled(snapshot.preferences.tray_enabled);
+            tray.update(&snapshot);
             let signature = format!("{:?}", snapshot);
             if signature != previous {
                 apply(&app, &snapshot);
@@ -56,6 +57,7 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
 
 pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
     app.set_busy(snapshot.busy);
+    app.set_exporting(snapshot.exporting);
     app.set_connected(snapshot.connected);
     app.set_status(crate::country::status(snapshot).into());
     app.set_message(snapshot.message.clone().into());
@@ -69,6 +71,12 @@ pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
         .get_relays()
         .row_data(app.get_selected() as usize)
         .map(|r| r.path);
+    let marked: std::collections::HashSet<_> = app
+        .get_relays()
+        .iter()
+        .filter(|r| r.marked)
+        .map(|r| r.path)
+        .collect();
     let rows: Vec<_> = snapshot
         .relays
         .iter()
@@ -83,6 +91,10 @@ pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
             .contains(&app.get_query().to_lowercase())
         })
         .map(|r| RelayRow {
+            marked: marked.contains(&slint::SharedString::from(
+                r.path.to_string_lossy().as_ref(),
+            )),
+            code: r.country.clone().into(),
             name: r.name.clone().into(),
             country: crate::country::name(&r.country).unwrap_or("UNKNOWN").into(),
             checked: r.checked.clone().into(),
@@ -94,6 +106,7 @@ pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
             .and_then(|path| rows.iter().position(|r| r.path == path))
             .map_or(-1, |index| index as i32),
     );
+    app.set_selected_count(rows.iter().filter(|r| r.marked).count() as i32);
     app.set_relays(ModelRc::new(VecModel::from(rows)));
     app.set_profiles(ModelRc::new(VecModel::from(
         snapshot

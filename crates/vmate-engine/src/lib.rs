@@ -2,6 +2,7 @@
 
 mod automatic;
 mod country;
+pub mod export;
 mod host;
 pub mod model;
 mod operations;
@@ -46,6 +47,12 @@ pub(crate) struct State {
 }
 
 impl State {
+    fn diagnose(&mut self, error: anyhow::Error) {
+        let text = format!("{error:#}");
+        self.snapshot.error = text.chars().take(8192).collect();
+        self.event(text);
+    }
+
     pub fn event(&mut self, text: String) {
         if self.snapshot.events.len() == 128 {
             self.snapshot.events.remove(0);
@@ -69,6 +76,22 @@ impl Port {
         let mut state = self.state.lock().unwrap();
         if self.shutdown.is_cancelled() {
             bail!("Engine is shutting down.");
+        }
+        let saving = matches!(&command, Command::Save(_));
+        let exporting = matches!(
+            &command,
+            Command::Export { .. } | Command::ExportBatch { .. }
+        );
+        if saving || exporting {
+            if (saving && state.snapshot.saving) || (exporting && state.snapshot.exporting) {
+                bail!("This action is already in progress.");
+            }
+            self.sender
+                .try_send(command)
+                .map_err(|e| anyhow::anyhow!("engine queue: {e}"))?;
+            state.snapshot.saving |= saving;
+            state.snapshot.exporting |= exporting;
+            return Ok(());
         }
         if state.snapshot.busy {
             bail!("Finish or cancel the current operation first.");

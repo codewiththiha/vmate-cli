@@ -61,7 +61,7 @@ pub(super) fn check(
     preferences.country_lookup = false;
     port.send(vmate_engine::model::Command::Save(preferences))
         .unwrap();
-    while port.snapshot().busy && Instant::now() < deadline {
+    while (port.snapshot().busy || port.snapshot().saving) && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(10));
     }
     for mac in [false, true] {

@@ -32,9 +32,11 @@ def pointer_input(window, profile):
     assert output('xdotool', 'getwindowgeometry', '--shell', window) == baseline
     output('xdotool', 'mousemove', '--window', window, '70', '326', 'click', '1')
     time.sleep(0.2)
-    output('xdotool', 'mousemove', '--window', window, '450', '122', 'click', '1',
+    output('xdotool', 'mousemove', '--window', window, '450', '225', 'click', '1',
            'key', 'Down', 'Down', 'Return')
-    output('xdotool', 'mousemove', '--window', window, '450', '372', 'click', '1',
+    output('xdotool', 'mousemove', '--window', window, '340', '103', 'click', '1')
+    time.sleep(0.2)
+    output('xdotool', 'mousemove', '--window', window, '450', '324', 'click', '1',
            'key', 'ctrl+a', 'type', '--clearmodifiers', 'Pointer regression')
     output('xdotool', 'mousemove', '--window', window, '260', '722', 'click', '1')
     path = profile / 'vmate-cli/desktop.json'
@@ -78,6 +80,10 @@ def main():
                               'minimize': 'passed', 'maximize': 'passed',
                               'close_exit_code': app.returncode,
                               'network_operations': 'none requested'}))
+        except Exception:
+            if app.poll() is not None:
+                raise AssertionError(f'App exited during native smoke: {app.stderr.read().decode()}')
+            raise
         finally:
             if app.poll() is None:
                 app.terminate()

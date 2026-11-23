@@ -6,22 +6,35 @@ use slint::ComponentHandle;
 use std::sync::mpsc::{SyncSender, sync_channel};
 
 pub(super) struct Session {
-    sender: Option<SyncSender<bool>>,
+    sender: Option<SyncSender<(bool, bool, bool)>>,
     worker: Option<std::thread::JoinHandle<()>>,
-    requested: bool,
+    requested: Option<(bool, bool, bool)>,
 }
 
 impl Session {
-    pub(super) fn new(app: slint::Weak<AppWindow>) -> Self {
+    pub(super) fn new(app: slint::Weak<AppWindow>, port: vmate_engine::Port) -> Self {
         let (sender, receiver) = sync_channel(1);
         let worker = std::thread::spawn(move || {
             let mut handle: Option<ksni::blocking::Handle<Icon>> = None;
-            while let Ok(enabled) = receiver.recv() {
+            let mut previous_enabled = false;
+            while let Ok((enabled, _, _)) = receiver.recv() {
+                if enabled == previous_enabled {
+                    if let Some(active) = &handle {
+                        active.update(|_| {});
+                    }
+                    continue;
+                }
+                previous_enabled = enabled;
                 if let Some(previous) = handle.take() {
                     previous.shutdown().wait();
                 }
                 if enabled {
-                    match (Icon { app: app.clone() }).spawn() {
+                    match (Icon {
+                        app: app.clone(),
+                        port: port.clone(),
+                    })
+                    .spawn()
+                    {
                         Ok(active) => {
                             report(&app, true, None);
                             handle = Some(active);
@@ -39,18 +52,23 @@ impl Session {
         Self {
             sender: Some(sender),
             worker: Some(worker),
-            requested: false,
+            requested: None,
         }
     }
 
-    pub(super) fn set_enabled(&mut self, enabled: bool) {
-        if enabled != self.requested
+    pub(super) fn update(&mut self, snapshot: &vmate_engine::model::Snapshot) {
+        let key = (
+            snapshot.preferences.tray_enabled,
+            snapshot.busy,
+            snapshot.connected,
+        );
+        if Some(key) != self.requested
             && self
                 .sender
                 .as_ref()
-                .is_some_and(|sender| sender.try_send(enabled).is_ok())
+                .is_some_and(|sender| sender.try_send(key).is_ok())
         {
-            self.requested = enabled;
+            self.requested = Some(key);
         }
     }
 }
@@ -66,6 +84,7 @@ impl Drop for Session {
 
 struct Icon {
     app: slint::Weak<AppWindow>,
+    port: vmate_engine::Port,
 }
 
 impl ksni::Tray for Icon {
@@ -100,12 +119,38 @@ impl ksni::Tray for Icon {
         reopen(&self.app, false);
     }
 
+    fn menu_about_to_show(&mut self) {}
+
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
         use ksni::menu::StandardItem;
+        let snapshot = self.port.snapshot();
         vec![
             StandardItem {
                 label: "Open vmate".into(),
                 activate: Box::new(|this: &mut Self| reopen(&this.app, false)),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: "Connect".into(),
+                enabled: !snapshot.busy,
+                activate: Box::new(|this: &mut Self| {
+                    let _ = this
+                        .app
+                        .upgrade_in_event_loop(|app| app.invoke_auto_connect());
+                }),
+                ..Default::default()
+            }
+            .into(),
+            StandardItem {
+                label: if snapshot.connected {
+                    "Disconnect"
+                } else {
+                    "Stop current operation"
+                }
+                .into(),
+                enabled: snapshot.busy,
+                activate: Box::new(|this: &mut Self| this.port.cancel()),
                 ..Default::default()
             }
             .into(),

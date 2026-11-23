@@ -5,7 +5,7 @@ import base64
 import sys
 
 SCENARIOS = ['home-idle', 'home-scanning', 'home-connecting', 'home-connected', 'home-retrying', 'home-stopping', 'home-exhausted', 'home-permission', 'connected-library', 'about', 'library', 'relay-details', 'setup-bottom', 'empty', 'scanning', 'connection', 'connected', 'setup-linux',
-             'setup-macos', 'missing-openvpn', 'permission-denied', 'activity', 'preferences', 'preferences-bottom']
+             'setup-macos', 'missing-openvpn', 'permission-denied', 'activity', 'preferences', 'preferences-bottom', 'preferences-presets', 'preferences-connection', 'relay-export']
 
 
 def main():

@@ -11,7 +11,7 @@ on:
         type: string
         default: desktop-v1.2.4-alpha.2
   push:
-    branches: [main, feat/slint-desktop, fix/desktop-input-tray, fix/desktop-theme-countries, fix/desktop-session-controls]
+    branches: [main, feat/slint-desktop, fix/desktop-input-tray, fix/desktop-theme-countries, fix/desktop-session-controls, fix/desktop-settings-selection]
   pull_request:
     branches: [main]
 permissions:
@@ -36,12 +36,13 @@ jobs:
       - run: cargo build -p vmate-desktop --locked
       - run: target/debug/vmate-desktop --capture-dir review/screenshots
       - run: python3 tools/review_screenshots.py review/screenshots
-      - run: xvfb-run -a python3 tools/native_smoke.py target/debug/vmate-desktop > review/native-linux.json
+      - run: dbus-run-session -- xvfb-run -a python3 tools/native_smoke.py target/debug/vmate-desktop > review/native-linux.json
       - name: Real tray lifecycle against a disposable D-Bus host
         run: |
           python3 -m venv /tmp/vmate-tray-tests
           /tmp/vmate-tray-tests/bin/pip install dbus-next==0.2.3
           dbus-run-session -- xvfb-run -a /tmp/vmate-tray-tests/bin/python tools/tray_smoke.py target/debug/vmate-desktop > review/tray-linux.json
+          dbus-run-session -- xvfb-run -a /tmp/vmate-tray-tests/bin/python tools/tray_session_smoke.py target/debug/vmate-desktop > review/tray-session-linux.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

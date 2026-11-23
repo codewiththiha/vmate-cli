@@ -59,6 +59,7 @@ async def request(bus, destination, path, interface, member, signature='', body=
 
 
 async def menu_action(bus, service, label):
+    await request(bus, service, '/MenuBar', 'com.canonical.dbusmenu', 'AboutToShow', 'i', [0])
     body = await request(bus, service, '/MenuBar', 'com.canonical.dbusmenu',
                          'GetLayout', 'iias', [0, -1, []])
     pending = [body[1]]
@@ -90,6 +91,10 @@ async def exercise(binary, bus, watcher, profile, mode):
             await asyncio.sleep(0.5)
             assert not watcher.items, 'Tray must be opt-in'
             close_window()
+            if mode == 'unavailable':
+                await asyncio.sleep(0.3)
+                assert process.poll() is None and visible(), 'Missing host must not exit enabled tray mode'
+                subprocess.run(['xdotool', 'mousemove', '--window', visible()[0], '80', '708', 'click', '1'], check=True)
         else:
             await wait_for(lambda: watcher.items, 'Tray must register with the test host')
             service = watcher.items[-1]
@@ -113,11 +118,10 @@ async def exercise(binary, bus, watcher, profile, mode):
                 await menu_action(bus, service, 'Settings')
                 await asyncio.sleep(0.2)
                 window = visible()[0]
-                subprocess.run(['xdotool', 'mousemove', '--window', window, '700', '400',
-                                'click', '--repeat', '25', '--delay', '15', '5'], check=True)
+                subprocess.run(['xdotool', 'mousemove', '--window', window, '201', '356',
+                                'click', '1'], check=True)
                 await asyncio.sleep(0.2)
-                subprocess.run(['xdotool', 'mousemove', '--window', window, '201', '619',
-                                'click', '1', 'mousemove', '--window', window, '260', '722',
+                subprocess.run(['xdotool', 'mousemove', '--window', window, '260', '722',
                                 'click', '1'], check=True)
                 await wait_for(lambda: not json.loads((config / 'desktop.json').read_text())['tray_enabled'],
                                'Checkbox and Save must persist disabled tray')
@@ -134,6 +138,9 @@ async def exercise(binary, bus, watcher, profile, mode):
                 await wait_for(visible, 'Losing the host must leave a reachable window')
                 await asyncio.sleep(0.2)
                 close_window()
+                await asyncio.sleep(0.3)
+                assert process.poll() is None and visible(), 'Host loss must not exit enabled tray mode'
+                subprocess.run(['xdotool', 'mousemove', '--window', visible()[0], '80', '708', 'click', '1'], check=True)
         await wait_for(lambda: process.poll() is not None, 'Quit must finish teardown')
         assert process.returncode == 0, process.stderr.read().decode()
     finally:

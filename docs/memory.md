@@ -231,3 +231,51 @@ error; the app does not infer process ownership from unrelated OpenVPN PIDs.
   all-targets/all-features clippy, fmt, shape/dups, source comment/budget and
   diff guards pass. Existing YAML artifact globs are not source block comments.
   No push, release or main merge performed; live NM/polkit/egress remain untested.
+
+## Usable settings, selected exports and persistent tray sessions
+
+Branch fix/desktop-settings-selection addresses disabled settings during VPN work.
+The command port now admits bounded settings/export maintenance without replacing
+an active cancellation token. The worker services it while awaiting the owned
+operation. Ready/saving/exporting state prevents premature draft initialization,
+repeat submissions and closing before accepted maintenance finishes.
+
+- Settings now separates General, Presets and Connection. New preset is explicit;
+  an editable frontend draft preserves changes across preset selection and allows
+  immediate assignments. Save indicates dirty/invalid/saving/saved state; Discard
+  restores saved preferences. Appearance previews without persisting until Save.
+- Long press (550ms), right-click Select, Select all and Clear use visible relay
+  models keyed by path. Watcher refreshes preserve marked paths. Filtered-out
+  selections are dropped rather than silently included in an export.
+- The export overlay disables underlying focus/input, captures selected rows,
+  provides a folder picker and editable path, previews filenames, and offers
+  name, JP, name_JP; full country names changes these to japan/name_japan.
+  Name-only exports ignore the country toggle. Unknown countries are explicit.
+- Batch size is bounded to 500, with up to 10,000 create-new attempts per filename.
+  Collisions receive suffixes; no file is overwritten. Failed copies remove their
+  incomplete output and report partial progress without deleting completed files.
+- Saved tray mode keeps the process and VPN alive when closing. Missing hosts
+  keep the window visible instead of quitting; host loss reopens it. Click only
+  reopens; menu Connect, Disconnect/Stop, Settings and Quit use existing intents.
+  A bounded worker updates menu state on connection/busy changes and menu opening.
+- Headless real-component tests exercise preset creation/rename/assign/save,
+  invalid edits/discard, long press/release, actual right-click menu selection,
+  Select all, and export preview styles. Input contrast remains tested at 4.5:1.
+- Native X11 smoke saves through the real appearance/name controls. Disposable
+  D-Bus tests cover tray opt-in, disabled mode, host loss and second launch.
+  A separate real-input test uses an isolated nmcli fixture: close/reopen,
+  saving while connected, selected export to Saved_config_japan.ovpn while
+  connected, tray Disconnect/Connect and Quit all pass. Export bytes match source.
+- Initial native export harness clicks raced a layout transition; waiting for
+  the view transition fixed the harness. Two consecutive session runs passed.
+  A native startup timeout without a session bus prompted wrapping CI smoke in
+  dbus-run-session and retaining exited-app stderr for useful failure reports.
+- Actual renderer coverage is now 216 captures, adding Presets, Connection and
+  Export at four sizes in light/dark. Reviewed narrow General/Presets and dark
+  Export: pinned Save, visible labels and unclipped preview/actions. Long forms
+  scroll at minimum size; no claim that every control fits without scrolling.
+- No live NM/polkit/egress, GNOME/KDE, Wayland or macOS interaction proof is claimed.
+- Final gates: 181 workspace Rust tests, 12 packaging tests, strict workspace
+  all-targets/all-features clippy, fmt, shape/dups, source comments/budget and diff
+  guards pass. Final native session smoke also verifies export while connected.
+  Changes remain local; no push, release or main merge is authorized/performed.

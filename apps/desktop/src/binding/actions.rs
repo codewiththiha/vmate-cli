@@ -37,7 +37,8 @@ pub(super) fn bind(app: &AppWindow, port: &Port) {
         );
     });
     relay_actions(app, port);
-    preferences(app, port);
+    super::relays::bind(app, port);
+    preferences(app);
 }
 
 fn relay_actions(app: &AppWindow, port: &Port) {
@@ -56,38 +57,9 @@ fn relay_actions(app: &AppWindow, port: &Port) {
             );
         }
     });
-    let p = port.clone();
-    let weak = app.as_weak();
-    app.on_export_relay(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let Some(row) = app.get_relays().row_data(app.get_selected() as usize) else {
-            return;
-        };
-        let p = p.clone();
-        let target = weak.clone();
-        if let Err(error) = slint::spawn_local(async move {
-            if let Some(file) = rfd::AsyncFileDialog::new()
-                .set_file_name("relay.ovpn")
-                .save_file()
-                .await
-            {
-                send(
-                    &p,
-                    &target,
-                    Command::Export {
-                        path: row.path.to_string().into(),
-                        destination: file.path().into(),
-                    },
-                );
-            }
-        }) {
-            app.set_diagnostic(format!("Cannot open export dialog: {error}").into());
-        }
-    });
 }
 
-fn preferences(app: &AppWindow, port: &Port) {
-    super::settings::bind(app, port);
+fn preferences(app: &AppWindow) {
     let weak = app.as_weak();
     app.on_copy_command(move || {
         if let Some(app) = weak.upgrade() {
@@ -120,6 +92,8 @@ pub(super) fn closing(app: &AppWindow, port: &Port) -> std::rc::Rc<std::cell::Ce
         flag.set(true);
         p.cancel();
         if !p.snapshot().busy
+            && !p.snapshot().saving
+            && !p.snapshot().exporting
             && let Some(app) = weak.upgrade()
         {
             let _ = app.hide();
@@ -130,15 +104,17 @@ pub(super) fn closing(app: &AppWindow, port: &Port) -> std::rc::Rc<std::cell::Ce
     let p = port.clone();
     let weak = app.as_weak();
     app.window().on_close_requested(move || {
+        if !p.snapshot().ready { return slint::CloseRequestResponse::KeepWindowShown; }
         if let Some(app) = weak.upgrade()
-            && app.get_tray_active()
+            && p.snapshot().preferences.tray_enabled
         {
-            let _ = app.hide();
+            if app.get_tray_active() { let _ = app.hide(); }
+            else { app.set_diagnostic("Tray host unavailable. Keep this window open or use Quit vmate to disconnect and exit.".into()); }
             return slint::CloseRequestResponse::KeepWindowShown;
         }
         flag.set(true);
         p.cancel();
-        if p.snapshot().busy {
+        if p.snapshot().busy || p.snapshot().saving || p.snapshot().exporting {
             slint::CloseRequestResponse::KeepWindowShown
         } else {
             slint::CloseRequestResponse::HideWindow

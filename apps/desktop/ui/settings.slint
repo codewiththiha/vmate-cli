@@ -8,6 +8,7 @@ export component Settings inherits Rectangle {
     in-out property <bool> tray-enabled;
     in property <bool> review-scroll;
     in property <[string]> names;
+    in-out property <int> page;
     in-out property <int> editing;
     in-out property <int> scan-index;
     in-out property <int> connect-index;
@@ -19,58 +20,79 @@ export component Settings inherits Rectangle {
     in-out property <bool> auto-reconnect;
     in-out property <bool> reduced;
     in-out property <bool> lookup;
+    in property <bool> dirty;
+    in property <bool> valid: true;
+    in property <bool> saving;
+    in property <string> feedback;
+    callback new-preset;
     callback select-preset(int);
     callback save;
+    callback discard;
     background: Theme.paper;
     VerticalBox { padding: 0px; spacing: 0px;
+        VerticalBox { padding: 24px; spacing: 16px;
+            Text { text: "Settings"; color: Theme.ink; font-size: 24px; font-weight: 600; }
+            HorizontalBox { spacing: 8px;
+                Action { label: "General"; primary: root.page == 0; clicked => { root.page = 0; } }
+                Action { label: "Presets"; primary: root.page == 1; clicked => { root.page = 1; } }
+                Action { label: "Connection"; primary: root.page == 2; clicked => { root.page = 2; } }
+                Rectangle { horizontal-stretch: 1; }
+            }
+        }
+        Rule {}
         ScrollView { content-y: root.review-scroll ? min(0px, self.height - self.content-height) : 0px; content-width: self.width - 12px;
             HorizontalBox { padding: 24px; spacing: 0px; alignment: start;
                 VerticalBox { padding: 0px; spacing: 16px; alignment: start; max-width: 720px; horizontal-stretch: 1;
-                    Text { text: "Settings"; color: Theme.ink; font-size: 24px; font-weight: 600; }
-                    SettingField { label: "Appearance";
-                        ComboBox { model: ["System", "Light", "Dark"]; current-index <=> root.appearance; }
+                    if root.page == 0: VerticalBox { padding: 0px; spacing: 16px; alignment: start;
+                        SettingField { label: "Appearance";
+                            ComboBox { model: ["System", "Light", "Dark"]; current-index <=> root.appearance; }
+                        }
+                        CheckBox { text: "Reduce motion"; checked <=> root.reduced; }
+                        Rule {}
+                        if !root.mac: Text { text: "Keep running in the tray"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                        if !root.mac: CheckBox { text: "Show tray icon · close window to tray"; checked <=> root.tray-enabled; }
+                        if !root.mac: Text { text: root.tray-active ? "Tray ready. Closing keeps your VPN running. Click to reopen." : "Requires a StatusNotifier/AppIndicator host. If unavailable, the window stays open."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                        Rule {}
+                        CheckBox { text: "Look up relay countries"; checked <=> root.lookup; }
+                        Text { text: "Uses ipinfo.io and cached results. Sends relay IPs, not your traffic. Existing unknown relays can be looked up from their context menu."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
                     }
-                    CheckBox { text: "Reduce motion"; checked <=> root.reduced; }
-                    Rule {}
-                    Text { text: "Scan presets"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-                    SettingField { label: "Edit preset";
-                        ComboBox { model: root.names; current-index <=> root.editing; selected(index) => { root.select-preset(self.current-index); } }
+                    if root.page == 1: VerticalBox { padding: 0px; spacing: 16px; alignment: start;
+                        HorizontalBox {
+                            SettingField { label: "Edit preset";
+                                ComboBox { model: root.names; current-index: root.editing; selected(value) => { root.select-preset(self.current-index); } }
+                            }
+                            Action { label: "+ New preset"; enabled: root.names.length < 16 && !root.saving; clicked => { root.new-preset(); } }
+                        }
+                        SettingField { label: "Preset name"; LineEdit { text <=> root.name; } }
+                        HorizontalBox { padding: 0px; spacing: 16px;
+                            SettingField { label: "Workers · 1–500"; LineEdit { text <=> root.workers; input-type: number; } }
+                            SettingField { label: "Timeout · 1–120 seconds"; LineEdit { text <=> root.timeout; input-type: number; } }
+                        }
+                        Rule {}
+                        Text { text: "Use presets for"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                        HorizontalBox { padding: 0px; spacing: 16px;
+                            SettingField { label: "Scan"; ComboBox { model: root.names; current-index <=> root.scan-index; } }
+                            SettingField { label: "Connect"; ComboBox { model: root.names; current-index <=> root.connect-index; } }
+                        }
+                        Text { text: "Assign new presets immediately. Save applies changes to the next action, without interrupting an active VPN."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
                     }
-                    SettingField { label: "Preset name · change to create a new preset";
-                        LineEdit { text <=> root.name; }
+                    if root.page == 2: VerticalBox { padding: 0px; spacing: 16px; alignment: start;
+                        Text { text: "If the connection drops"; color: Theme.ink; font-size: 16px; font-weight: 600; }
+                        CheckBox { text: "Auto-reconnect"; checked <=> root.auto-reconnect; }
+                        Text { text: "Try another saved relay, then rescan. Disconnect always stops the workflow."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        SettingField { label: "Rescan loop limit · 1–20";
+                            LineEdit { text <=> root.retry-limit; input-type: number; }
+                        }
+                        Text { text: "Maximum rescans per Connect action. The workflow stops when this limit is reached, even with auto-reconnect enabled."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
                     }
-                    HorizontalBox { padding: 0px; spacing: 16px;
-                        SettingField { label: "Workers · 1–500"; LineEdit { text <=> root.workers; input-type: number; } }
-                        SettingField { label: "Timeout · 1–120 seconds"; LineEdit { text <=> root.timeout; input-type: number; } }
-                    }
-                    Rule {}
-                    Text { text: "Action assignments"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-                    HorizontalBox { padding: 0px; spacing: 16px;
-                        SettingField { label: "Scan preset"; ComboBox { model: root.names; current-index <=> root.scan-index; } }
-                        SettingField { label: "Connect preset"; ComboBox { model: root.names; current-index <=> root.connect-index; } }
-                    }
-                    Text { text: "Save a new preset before assigning it."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-                    Rule {}
-                    Text { text: "Connection"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-                    CheckBox { text: "Auto-reconnect"; checked <=> root.auto-reconnect; }
-                    SettingField { label: "Rescan loop limit · 1–20";
-                        LineEdit { text <=> root.retry-limit; input-type: number; }
-                    }
-                    Rule {}
-                    Text { text: "Country lookup"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-                    CheckBox { text: "Look up relay countries with ipinfo.io"; checked <=> root.lookup; }
-                    Text { text: "On by default. Uses the built-in token and cached results. Sends relay IPs to ipinfo.io; disable to opt out. Rescan to resolve older unknown entries."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
-                    if !root.mac: Rule {}
-                    if !root.mac: Text { text: "System tray"; color: Theme.ink; font-size: 16px; font-weight: 600; }
-                    if !root.mac: CheckBox { text: "Show tray icon · close window to tray"; checked <=> root.tray-enabled; }
-                    if !root.mac: Text { text: root.tray-active ? "Tray ready. Its menu can reopen or quit vmate." : "Requires a StatusNotifier/AppIndicator host. Without one, closing exits."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
                 }
             }
         }
         Rule {}
         HorizontalBox { padding: 20px; spacing: 12px;
-            Action { label: "Save settings"; primary: true; enabled: !root.busy; clicked => { root.save(); } }
-            Text { text: root.busy ? "Available after the current operation stops." : "Appearance previews immediately. Save to keep changes."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+            Action { label: root.saving ? "Saving…" : "Save settings"; primary: true; enabled: root.dirty && root.valid && !root.saving; clicked => { root.save(); } }
+            if root.dirty: Action { label: "Discard"; enabled: !root.saving; clicked => { root.discard(); } }
+            Text { text: root.feedback; color: Theme.muted; font-size: 12px; wrap: word-wrap; vertical-alignment: center; }
         }
     }
 }
