@@ -30,3 +30,10 @@ or a supply-chain audit. Developer-ID signing/notarization remain absent, and th
 public release notes must state experimental status and functional limitations.
 Publishing occurs only through the explicitly requested prerelease job, after all
 package and Linux review gates pass; ordinary review pushes do not publish.
+
+Pinned objc2 revisions retain their upstream MIT summary and original full
+Steven Sheldon notice from the documented license-clarification parent commit.
+For dispatch 0.2.0, the declared MIT license and author are checked exactly,
+and a reconstructed MIT notice is explicitly identified as such. Other
+unreviewed notice omissions still fail closed. See packaging/licenses for
+provenance; no independent legal audit is asserted.
