@@ -28,6 +28,7 @@ class NativeMetadata(unittest.TestCase):
                 info = subprocess.check_output(['bsdtar', '-xOf', str(package), '.PKGINFO'], text=True)
                 self.assertEqual('depend = openvpn\n' in info, variant == 'system')
                 self.assertIn('conflict = vmate', info)
+                self.assertIn('depend = ttf-dejavu', info)
                 if variant == 'bundled':
                     self.assertIn('pkgname = vmate-bundled', info)
                 listing = subprocess.check_output(['bsdtar', '-tvf', str(package)], text=True)

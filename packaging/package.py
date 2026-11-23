@@ -45,7 +45,7 @@ Architecture: {args.arch}
 Maintainer: codewiththiha <kt0071@gmail.com>
 Conflicts: {conflict}
 Provides: vmate (= {args.version})
-Depends: libc6 (>= 2.39), libxkbcommon0, libxkbcommon-x11-0, libfontconfig1, libx11-6, libx11-xcb1, libxcursor1, libxrandr2, libxi6, libxcb1, libwayland-client0{dependency}
+Depends: libc6 (>= 2.39), libxkbcommon0, libxkbcommon-x11-0, libfontconfig1, libx11-6, libx11-xcb1, libxcursor1, libxrandr2, libxi6, libxcb1, libwayland-client0, fonts-dejavu-core{dependency}
 Recommends: network-manager-openvpn, xdg-desktop-portal
 Description: OpenVPN relay library and system VPN frontend
 ''')
