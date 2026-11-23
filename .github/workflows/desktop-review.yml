@@ -17,6 +17,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils
+      - run: python3 -m unittest discover -s packaging/tests -v
       - run: python3 tools/shape_check.py --dups
       - run: cargo fmt --check
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings

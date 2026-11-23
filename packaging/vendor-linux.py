@@ -9,6 +9,26 @@ import subprocess
 import sys
 
 
+def package_owner(source):
+    canonical = source.resolve()
+    candidates = dict.fromkeys((source, canonical))
+    if canonical.is_relative_to('/usr/lib'):
+        candidates[Path('/') / canonical.relative_to('/usr')] = None
+    owners = set()
+    for candidate in candidates:
+        result = subprocess.run(['dpkg-query', '-S', str(candidate)],
+                                capture_output=True, text=True, check=False)
+        if result.returncode:
+            continue
+        for line in result.stdout.splitlines():
+            package, separator, filename = line.rpartition(': ')
+            if separator and Path(filename).resolve() == canonical:
+                owners.add(package)
+    if len(owners) != 1:
+        raise RuntimeError(f'expected one verified package owner for {source}: {owners}')
+    return owners.pop()
+
+
 def main():
     prefix = Path(sys.argv[1]).resolve()
     executable = prefix / 'bin/openvpn'
@@ -26,8 +46,7 @@ def main():
         subprocess.run(['patchelf', '--set-rpath', '$ORIGIN', str(target)], check=True)
         manifest.append({'source': name, 'name': target.name,
                          'sha256': hashlib.sha256(target.read_bytes()).hexdigest()})
-        package = subprocess.check_output(['dpkg-query', '-S', str(source.resolve())], text=True)
-        package = package.split(': /')[0].splitlines()[0]
+        package = package_owner(source)
         notice = Path('/usr/share/doc') / package.split(':')[0] / 'copyright'
         if not notice.exists():
             raise RuntimeError(f'missing redistribution notice: {package}')
