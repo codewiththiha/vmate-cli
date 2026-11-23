@@ -23,9 +23,10 @@ impl Configuration {
                 "Run the desktop as your normal user; authorize VPN changes through the system service."
             );
         }
+        let database = std::env::var_os("VMATE_DB").map(std::path::PathBuf::from);
         Ok(Self {
             config_dir: vmate_core::paths::config_dir()?,
-            database: vmate_core::paths::default_db_path()?,
+            database: vmate_core::paths::database_path(database.as_deref())?,
             openvpn: vmate_core::ovpn::binary::resolve(None)?,
         })
     }

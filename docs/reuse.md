@@ -68,3 +68,12 @@ feature test modules until there are two real cross-feature callers.
   and automatic connection, rather than trusting a potentially stale UI model.
 - `scan.rs::with_preset`: shared manual/automatic scan execution; action selection
   belongs to the engine, never the Slint callback layer.
+
+- `paths.rs::database_path`: shared CLI/desktop override expansion and default
+  database resolution, including VMATE_DB at each frontend boundary.
+- `platform.rs::recent_from`: refresh and background synchronization share one mapping;
+  the history watcher owns one SQLite pool, closed on engine teardown.
+- `apps/cli/tests/desktop_parity.rs`: actual CLI plus desktop actor integration
+  against the same WAL database; no network or authentication claim.
+- `capture/tests/flow.rs`: real Slint callbacks through the actor to shared scan
+  and storage, selected-path stability, and pixel-based branding alignment.

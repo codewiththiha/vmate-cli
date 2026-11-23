@@ -27,10 +27,7 @@ impl Settings {
             )
         })?;
 
-        let db_path = match &cli.db {
-            Some(path) => paths::expand_path(path),
-            None => paths::default_db_path()?,
-        };
+        let db_path = paths::database_path(cli.db.as_deref())?;
 
         Ok(Settings {
             db_path,

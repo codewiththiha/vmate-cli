@@ -3,13 +3,16 @@ name: live-vpngate
 on:
   workflow_dispatch:
   push:
-    branches: [fix/linux-session-lifecycle, fix/scan-upgrade-compatibility]
+    branches: [fix/linux-session-lifecycle, fix/scan-upgrade-compatibility, feat/slint-desktop]
     paths:
       - .github/workflows/live-vpngate.yml
       - tools/live_vpngate.py
-      - apps/cli/src/ui/**
-      - crates/vmate-core/src/ovpn/**
+      - apps/cli/src/**
+      - crates/vmate-core/src/**
       - tools/linux_state.py
+      - crates/vmate-engine/**
+      - apps/cli/tests/desktop_parity.rs
+      - Cargo.lock
 
 permissions:
   contents: read
@@ -23,7 +26,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build
-        run: cargo build --locked
+        run: cargo build -p vmate-cli -p vmate-engine --examples --bins --locked
       - name: Test built-in relays in disposable network
         run: |
           mkdir -p evidence
@@ -36,7 +39,21 @@ jobs:
                 openvpn python3 python3-pyte iproute2 procps ca-certificates
               uname -a > /evidence/platform.txt
               openvpn --version >> /evidence/platform.txt
-              python3 /workspace/tools/live_vpngate.py
+              cli_status=0
+              python3 /workspace/tools/live_vpngate.py || cli_status=$?
+              export PYTHONPATH=/workspace/tools
+              python3 -c "from linux_state import network_state; print(network_state())" > /evidence/engine-before.txt
+              runuser -u nobody -- /workspace/target/debug/examples/desktop_probe \
+                /tmp/live.db /tmp/engine-cli-history openvpn recent > /evidence/engine-cli-history.json
+              runuser -u nobody -- /workspace/target/debug/examples/desktop_probe \
+                /tmp/engine.db /tmp/engine-scan openvpn scan > /evidence/engine-scan.json
+              runuser -u nobody -- /workspace/target/debug/vmate-cli \
+                --db /tmp/engine.db recent --no-tui --all > /evidence/cli-engine-history.txt
+              grep -q "opengw.net" /evidence/cli-engine-history.txt
+              python3 -c "from linux_state import network_state; print(network_state())" > /evidence/engine-after.txt
+              cmp /evidence/engine-before.txt /evidence/engine-after.txt
+              ! pgrep -x openvpn
+              test "$cli_status" = 0
               DEBIAN_FRONTEND=noninteractive apt-get install -y \
                 curl build-essential pkg-config libssl-dev libcap-ng-dev
               cd /tmp

@@ -1,5 +1,7 @@
 //! Serialize application operations and retain useful failure diagnostics.
 
+mod history;
+
 use crate::{Port, host::Host, model::Command, platform, scan};
 use anyhow::Result;
 use tokio::sync::mpsc;
@@ -9,6 +11,15 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
     if let Err(error) = platform::refresh(&port).await {
         fail(&port, error);
     }
+    let pool = match vmate_core::db::init_pool(&port.configuration.database).await {
+        Ok(pool) => pool,
+        Err(error) => {
+            fail(&port, error);
+            return;
+        }
+    };
+    let history = vmate_core::db::ConfigRepo::new(pool);
+    let watcher = tokio::spawn(history::watch(port.clone(), history));
     loop {
         let command = tokio::select! {
             biased;
@@ -41,6 +52,9 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
             state.snapshot.message =
                 "Inspect NetworkManager to confirm tunnel state before retrying.".into();
         }
+    }
+    if let Err(error) = watcher.await {
+        fail(&port, error.into());
     }
 }
 

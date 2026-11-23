@@ -6934,6 +6934,7 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "vmate-core",
+ "vmate-engine",
 ]
 
 [[package]]
@@ -6972,6 +6973,7 @@ dependencies = [
  "rfd",
  "slint",
  "slint-build",
+ "tempfile",
  "vmate-engine",
 ]
 

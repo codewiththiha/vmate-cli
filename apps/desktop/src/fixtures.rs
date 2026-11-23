@@ -101,6 +101,9 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
     }
     select_scenario(app, scenario, &mut snapshot);
     binding::apply(app, &snapshot);
+    if !snapshot.relays.is_empty() {
+        app.set_selected(0);
+    }
 }
 
 fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {

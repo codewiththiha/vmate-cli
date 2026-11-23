@@ -14,6 +14,9 @@ arboard.workspace = true
 image = { version = "0.25", default-features = false, features = ["png"] }
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [build-dependencies]
 slint-build = "=1.19.0"
 

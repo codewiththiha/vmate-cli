@@ -12,7 +12,7 @@ name: ci
 
 on:
   push:
-    branches: [main, fix/linux-session-lifecycle, fix/scan-upgrade-compatibility]
+    branches: [main, fix/linux-session-lifecycle, fix/scan-upgrade-compatibility, feat/slint-desktop]
   pull_request:
 
 permissions:
@@ -52,6 +52,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+
+      - name: Linux desktop build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libfontconfig1-dev fonts-dejavu-core
 
       - uses: Swatinem/rust-cache@v2
 

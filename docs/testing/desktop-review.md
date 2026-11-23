@@ -65,3 +65,32 @@ duplicate names, resource bounds, loop bounds and serialization. Real-component
 pointer tests exercise Home Connect/Cancel/Disconnect and disable restart during
 teardown. These do not validate live NetworkManager authorization or tunnel egress.
 The new automatic path has not been exercised against a real system VPN service.
+
+## CLI and desktop runner contract
+
+The latest local suite has 171 tests. The new CLI integration keeps a desktop
+engine open while the real CLI scans into its database. The engine observes the
+external write via a two-second background poll, then scans itself; the CLI lists and
+exports those results. The Slint test now uses the real binding and engine actor,
+not only callback flags, to verify scan completion reaches its actual relay model.
+External insertions/removals preserve selection by path or clear it. A pixel check
+keeps the logo and wordmark visual centers within two pixels at the tested size.
+The refreshed 96 captures are in review/runner-parity.
+
+The history watcher reads successful relay history, not CLI-only presentation options.
+CLI scan defaults and desktop named presets remain distinct. VMATE_DB is honored
+by both frontends; explicit CLI --db must point at the GUI's chosen database to
+share data. Raw CLI connect and desktop NetworkManager activation have different
+privilege/service boundaries, so passing one cannot prove the other.
+
+Prepared CI: workspace contracts on Linux/macOS, native Linux controls, screenshot
+matrix, packaging, and built-in public VPN Gate CLI sessions plus desktop-engine
+scan/history/export parity inside the disposable live-test container. The engine
+probe explicitly reports tunnel_tested=false; it is not a NetworkManager tunnel
+or egress test. No local fake is described as a live VPN test.
+
+Execution blocker: pushing the new revision failed because the workspace lacks
+GitHub authentication. No new hosted result is claimed. Public API inspection of
+older run 45118973809 (commit 6a6d5c2) showed linux-review passed, Linux package
+staging failed, and macOS artifact uploads failed. Failure logs require authorized
+access; those old results cannot establish the current branch's packaging status.

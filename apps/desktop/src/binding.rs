@@ -1,7 +1,7 @@
 //! Convert engine DTOs and user intent, never perform VPN orchestration here.
 
 use crate::{AppWindow, ProfileRow, RelayRow};
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
 use std::time::Duration;
 mod actions;
 mod settings;
@@ -69,23 +69,31 @@ pub(super) fn apply(app: &AppWindow, snapshot: &Snapshot) {
     app.set_openvpn(snapshot.openvpn.clone().into());
     app.set_service(snapshot.system_service.clone().into());
     app.set_activity(snapshot.events.join("\n\n").into());
-    app.set_relays(ModelRc::new(VecModel::from(
-        snapshot
-            .relays
-            .iter()
-            .filter(|r| {
-                format!("{} {}", r.name, r.country)
-                    .to_lowercase()
-                    .contains(&app.get_query().to_lowercase())
-            })
-            .map(|r| RelayRow {
-                name: r.name.clone().into(),
-                country: r.country.clone().into(),
-                checked: r.checked.clone().into(),
-                path: r.path.to_string_lossy().to_string().into(),
-            })
-            .collect::<Vec<_>>(),
-    )));
+    let selected = app
+        .get_relays()
+        .row_data(app.get_selected() as usize)
+        .map(|r| r.path);
+    let rows: Vec<_> = snapshot
+        .relays
+        .iter()
+        .filter(|r| {
+            format!("{} {}", r.name, r.country)
+                .to_lowercase()
+                .contains(&app.get_query().to_lowercase())
+        })
+        .map(|r| RelayRow {
+            name: r.name.clone().into(),
+            country: r.country.clone().into(),
+            checked: r.checked.clone().into(),
+            path: r.path.to_string_lossy().to_string().into(),
+        })
+        .collect();
+    app.set_selected(
+        selected
+            .and_then(|path| rows.iter().position(|r| r.path == path))
+            .map_or(-1, |index| index as i32),
+    );
+    app.set_relays(ModelRc::new(VecModel::from(rows)));
     app.set_profiles(ModelRc::new(VecModel::from(
         snapshot
             .profiles

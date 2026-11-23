@@ -147,6 +147,10 @@ pub(super) fn save(port: &Port, preferences: Preferences) -> Result<()> {
 
 pub(super) async fn recent(port: &Port) -> Result<Vec<Relay>> {
     let repo = ConfigRepo::new(vmate_core::db::init_pool(&port.configuration.database).await?);
+    recent_from(&repo).await
+}
+
+pub(super) async fn recent_from(repo: &ConfigRepo) -> Result<Vec<Relay>> {
     let relays = repo
         .list_recent(&CountryFilter::new(), Some(500), 0)
         .await?;

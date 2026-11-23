@@ -114,3 +114,14 @@ sessions. No evidence justifies increasing the universal default to 500.
 - Named presets independently configure manual Scan and automatic Connect.
 - Rescan loops are limited to 1–20; retry pauses cap at 30 seconds.
 - No new live VPN/egress or macOS automatic activation validation is claimed.
+
+
+### CLI/desktop parity and branding
+
+- 171 local workspace tests; real CLI/engine shared-database integration added.
+- Actual Slint binding test drives a scan and receives 277 fixture results.
+- Logo/wordmark centers align; pixel assertion permits at most two-pixel drift.
+- Background history polling: configured two seconds, not a measured latency guarantee.
+- VMATE_DB override now shared; CLI-only scan flags do not rewrite GUI presets.
+- New hosted runs blocked by absent GitHub authentication (push dry-run rejected).
+- Older run 45118973809: Linux review passed; package jobs failed. Logs inaccessible.

@@ -77,7 +77,7 @@ export component AppWindow inherits Window {
             MenuItem { title: "About vmate"; activated => { root.page = 5; } }
         }
     }
-    VerticalBox { spacing: 0px; padding: 0px;
+    VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; spacing: 0px; padding: 0px;
         if !root.mac: WindowControls {
             minimize => { root.minimized = true; }
             maximize => { root.maximized = !root.maximized; }
@@ -91,7 +91,9 @@ export component AppWindow inherits Window {
             if root.width >= 760px: Rectangle { width: 160px; background: #eef0e9;
                 VerticalBox { padding: 14px; spacing: 9px;
                     HorizontalBox { height: 66px; spacing: 9px;
-                        Image { source: @image-url("../assets/vmate.svg"); width: 30px; height: 30px; }
+                        Rectangle { width: 30px;
+                            Image { source: @image-url("../assets/vmate.svg"); width: 30px; height: 30px; y: (parent.height - self.height) / 2; }
+                        }
                         Text { text: "vmate"; font-size: 24px; font-weight: 700; color: Theme.ink; vertical-alignment: center; }
                     }
                     for label[index] in ["Home", "Relays", "Connections", "Activity", "Settings"]: Rectangle {

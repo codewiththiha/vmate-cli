@@ -45,6 +45,14 @@ pub fn builtin_dir() -> Result<PathBuf> {
     Ok(config_dir()?.join("builtin"))
 }
 
+/// Resolve a frontend override or the shared default database path.
+pub fn database_path(override_path: Option<&Path>) -> Result<PathBuf> {
+    match override_path {
+        Some(path) => Ok(expand_path(path)),
+        None => default_db_path(),
+    }
+}
+
 /// The default SQLite database path, creating the config directory if needed.
 pub fn default_db_path() -> Result<PathBuf> {
     let dir = config_dir()?;

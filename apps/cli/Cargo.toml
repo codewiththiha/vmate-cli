@@ -33,6 +33,7 @@ url.workspace = true
 vmate-core = { path = "../../crates/vmate-core" }
 
 [dev-dependencies]
+vmate-engine = { path = "../../crates/vmate-engine" }
 assert_cmd.workspace = true
 predicates.workspace = true
 tempfile.workspace = true

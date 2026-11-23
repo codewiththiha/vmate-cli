@@ -16,7 +16,7 @@ export component RelayList inherits Rectangle {
     callback import-relay;
     callback export-relay;
     background: Theme.paper;
-    VerticalBox { padding: 16px; spacing: 12px;
+    VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; padding: 16px; spacing: 12px;
         HorizontalBox { spacing: 12px;
             Text { text: "Relays"; color: Theme.ink; font-size: 24px; font-weight: 600; }
             Action { label: root.busy ? "Stop scan" : "Scan"; primary: true;

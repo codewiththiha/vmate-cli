@@ -12,7 +12,7 @@ export component Home inherits Rectangle {
     callback connect;
     callback cancel;
     background: Theme.paper;
-    VerticalBox { padding: root.compact ? 12px : 20px; spacing: root.compact ? 10px : 16px;
+    VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; padding: root.compact ? 12px : 20px; spacing: root.compact ? 10px : 16px;
         Rectangle { vertical-stretch: 1; }
         Text { text: root.stopping ? "Disconnecting" : root.connected ? "Connected" : root.status;
             color: Theme.ink; font-size: 25px; font-weight: 600; horizontal-alignment: center; }

@@ -49,6 +49,7 @@ pub(super) fn run(directory: &str) -> anyhow::Result<()> {
 
 #[cfg(test)]
 mod tests {
+    mod flow;
     use super::*;
     use slint::{
         LogicalPosition,
@@ -70,6 +71,7 @@ mod tests {
             renderer.render(&mut pixels, 1160);
         });
         assert!(pixels.windows(2).any(|pair| pair[0] != pair[1]));
+        flow::brand_alignment(&pixels);
         let clicked = Rc::new(std::cell::Cell::new(false));
         let flag = clicked.clone();
         app.on_scan(move || flag.set(true));
@@ -105,6 +107,7 @@ mod tests {
             "library scan must stay disabled during a VPN connection"
         );
         home_controls(&app, &window, &mut pixels, &click);
+        flow::check(&app, &window, &mut pixels, &click);
         app.hide().unwrap();
     }
 

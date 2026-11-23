@@ -1,5 +1,5 @@
 {
-  "rust_tests": 170,
+  "rust_tests": 171,
   "headless_scenarios": 24,
   "sizes": [
     [
@@ -51,5 +51,7 @@
     "automatic connection adapter against live NetworkManager"
   ],
   "public_release": false,
-  "capture_directory": "review/home-final"
+  "capture_directory": "review/runner-parity",
+  "latest_hosted_run": "not dispatched: GitHub authentication unavailable",
+  "parity": "real CLI + engine shared database and actual Slint binding, fixture OpenVPN"
 }
