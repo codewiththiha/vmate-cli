@@ -48,6 +48,7 @@ fn cli_writes_appear_in_running_desktop_and_engine_writes_in_cli() {
         "client\ndev tun\nremote cli-parity.example 1194 udp\n",
     )
     .unwrap();
+    let config = config.canonicalize().unwrap();
     cli(&database, &binary)
         .args(["scan", inputs.to_str().unwrap()])
         .assert()
