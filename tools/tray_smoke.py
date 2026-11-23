@@ -97,6 +97,12 @@ async def exercise(binary, bus, watcher, profile, mode):
             close_window()
             await wait_for(lambda: not visible(), 'Close must hide to tray')
             assert process.poll() is None, 'Hidden app must remain alive'
+            second = subprocess.run([binary], env=env, capture_output=True, timeout=10)
+            assert second.returncode == 0, second.stderr.decode()
+            await wait_for(visible, 'Second launch must reopen existing window')
+            assert len(visible()) == 1, 'Second launch must not create another window'
+            close_window()
+            await wait_for(lambda: not visible(), 'Reopened window must still hide to tray')
             await request(bus, service, '/StatusNotifierItem', 'org.kde.StatusNotifierItem',
                           'Activate', 'ii', [0, 0])
             await wait_for(visible, 'Tray activation must reopen window')
@@ -147,7 +153,7 @@ async def main():
         for mode in ('default', 'quit', 'disable', 'host-loss', 'unavailable'):
             with tempfile.TemporaryDirectory(prefix='vmate-tray-') as directory:
                 await exercise(str(Path(sys.argv[1]).resolve()), bus, watcher, Path(directory), mode)
-        print(json.dumps({'tray_default_off': 'passed', 'close_reopen': 'passed',
+        print(json.dumps({'tray_default_off': 'passed', 'close_reopen': 'passed', 'second_launch_reopens_one_window': 'passed',
                           'tray_quit': 'passed', 'disable_unregister': 'passed',
                           'host_loss_recovery': 'passed', 'unavailable_host_close': 'passed', 'host': 'disposable D-Bus fixture',
                           'network_operations': 'none requested'}))

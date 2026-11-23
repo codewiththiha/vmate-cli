@@ -23,18 +23,22 @@ pub async fn run(uuid: &str, host: &mut dyn ConnectHost, cancel: CancellationTok
         uuid,
         closed: false,
     };
-    let result = session(uuid, host, &cancel).await;
-    let cleanup = nm(&["connection", "down", "uuid", uuid]).await;
-    lease.closed = cleanup.is_ok() || matches!(active(uuid).await, Ok(false));
-    result?;
-    if !lease.closed {
-        cleanup.context("NetworkManager did not confirm VPN teardown")?;
-    }
-    Ok(())
+    let mut established = false;
+    let result = session(uuid, host, &cancel, &mut established).await;
+    let cleanup = teardown(uuid, established).await;
+    lease.closed = cleanup.is_ok();
+    cleanup.context("NetworkManager did not confirm VPN teardown")?;
+    result
 }
 
-async fn session(uuid: &str, host: &mut dyn ConnectHost, cancel: &CancellationToken) -> Result<()> {
+async fn session(
+    uuid: &str,
+    host: &mut dyn ConnectHost,
+    cancel: &CancellationToken,
+    established: &mut bool,
+) -> Result<()> {
     loop {
+        *established = false;
         status(uuid, false, host).await?;
         let arguments = ["connection", "up", "uuid", uuid];
         let activation = nm(&arguments);
@@ -49,6 +53,7 @@ async fn session(uuid: &str, host: &mut dyn ConnectHost, cancel: &CancellationTo
                 result = &mut activation => { result?; break; }
             }
         }
+        *established = true;
         status(uuid, true, host).await?;
         if !connected(uuid, host, cancel).await? {
             return Ok(());
@@ -63,7 +68,7 @@ async fn connected(
     host: &mut dyn ConnectHost,
     cancel: &CancellationToken,
 ) -> Result<bool> {
-    let mut tick = tokio::time::interval(Duration::from_secs(2));
+    let mut tick = tokio::time::interval(Duration::from_secs(1));
     loop {
         tokio::select! {
             biased;
@@ -75,8 +80,39 @@ async fn connected(
                 _ => {}
             },
             _ = tick.tick() => {
-                if !active(uuid).await? { bail!("NetworkManager VPN disconnected"); }
+                if !active(uuid).await? {
+                    host.notify("NetworkManager VPN disconnected").await?;
+                    return Ok(false);
+                }
             }
+        }
+    }
+}
+
+async fn teardown(uuid: &str, established: bool) -> Result<()> {
+    if established && !active(uuid).await? {
+        return Ok(());
+    }
+    let arguments = ["connection", "down", "uuid", uuid];
+    let down = nm(&arguments);
+    tokio::pin!(down);
+    let observed = async {
+        loop {
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            if !active(uuid).await? {
+                return Ok(());
+            }
+        }
+    };
+    tokio::select! {
+        biased;
+        result = &mut down => {
+            if !active(uuid).await? { Ok(()) }
+            else { result?; bail!("NetworkManager did not confirm VPN teardown"); }
+        }
+        result = observed, if established => result,
+        _ = tokio::time::sleep(Duration::from_secs(20)) => {
+            bail!("NetworkManager VPN teardown exceeded 20 seconds")
         }
     }
 }

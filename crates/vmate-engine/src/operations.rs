@@ -50,6 +50,9 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
             "Not connected"
         }
         .into();
+        if state.operation.is_cancelled() && !uncertain {
+            state.snapshot.message = "Operation stopped.".into();
+        }
         if uncertain {
             state.snapshot.message =
                 "Inspect NetworkManager to confirm tunnel state before retrying.".into();
@@ -65,6 +68,7 @@ async fn execute(port: &Port, command: Command) -> Result<()> {
         Command::AutoConnect => crate::automatic::run(port).await,
         Command::Refresh => platform::refresh(port).await,
         Command::Scan => scan::run(port).await,
+        Command::LookupCountry { path } => crate::country::lookup(port, &path).await,
         Command::Connect(uuid) => {
             let cancel = port.state.lock().unwrap().operation.clone();
             vmate_core::managed::run(&uuid, &mut Host(port.clone()), cancel).await

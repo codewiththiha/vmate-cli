@@ -21,6 +21,13 @@ export component Home inherits Rectangle {
                 background: root.stopping ? #59665f : touch.has-hover ? #173f35 : Theme.pine;
                 border-width: focus.has-focus ? 4px : 0px; border-color: #83aa9b;
                 animate background { duration: Theme.reduced-motion ? 0ms : 140ms; }
+                if root.busy && (!root.connected || root.stopping): Path {
+                    x: -8px; y: -8px; width: parent.width + 16px; height: parent.height + 16px;
+                    viewbox-width: 100; viewbox-height: 100;
+                    stroke: Theme.pine; stroke-width: 2px; fill: transparent;
+                    transform-rotation: Theme.reduced-motion ? 0deg : mod(animation-tick() / 4ms, 360) * 1deg;
+                    commands: "M 50 2 A 48 48 0 1 1 2 50";
+                }
                 Image { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: root.compact ? 48px : 58px; height: self.width; source: @image-url("../assets/power.svg"); }
                 focus := FocusScope { enabled: !root.stopping;
                     key-pressed(e) => { if e.text == " " || e.text == "\n" { root.busy ? root.cancel() : root.connect(); return accept; } return reject; }
@@ -35,15 +42,6 @@ export component Home inherits Rectangle {
         }
         Text { text: root.stopping ? "Please wait" : root.busy ? (root.connected ? "Disconnect" : "Cancel") : "Connect";
             horizontal-alignment: center; color: Theme.ink; font-size: 15px; }
-        HorizontalBox { Rectangle { horizontal-stretch: 1; }
-            if root.busy && !root.connected: Rectangle { width: 180px; height: 3px; background: root.busy && !root.connected ? Theme.rule : transparent; clip: true;
-                Rectangle { width: root.total > 0 && root.status == "Scanning" ? parent.width * root.completed / max(1, root.total) : 52px;
-                    height: 3px; background: root.busy && !root.connected ? Theme.pine : transparent;
-                    x: (root.total > 0 && root.status == "Scanning") || Theme.reduced-motion ? 0px : mod(animation-tick() / 8ms, 232) * 1px - 52px;
-                }
-            }
-            Rectangle { horizontal-stretch: 1; }
-        }
         Text { text: root.busy && root.status == "Scanning" ? "Checking relays · " + root.completed + " / " + root.total : "";
             font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
         Rectangle { vertical-stretch: 1; }

@@ -172,3 +172,19 @@ async fn fatal_service_errors_do_not_discard_history_or_retry() {
     );
     assert_eq!(fake.calls, ["recent"]);
 }
+
+#[tokio::test]
+async fn rescan_limit_is_exact_at_both_settings_boundaries() {
+    for limit in [1, 20] {
+        let mut fake = Fake::default();
+        assert!(
+            drive(&mut fake, vec![], true, limit, CancellationToken::new())
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            fake.calls.iter().filter(|call| **call == "scan").count(),
+            limit as usize
+        );
+    }
+}

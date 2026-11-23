@@ -98,6 +98,7 @@ pub enum Command {
     AutoConnect,
     Refresh,
     Scan,
+    LookupCountry { path: PathBuf },
     Connect(String),
     Export { path: PathBuf, destination: PathBuf },
     Import { path: PathBuf },

@@ -7014,6 +7014,7 @@ dependencies = [
  "isocountry",
  "ksni",
  "rfd",
+ "rustix 1.1.4",
  "slint",
  "slint-build",
  "tempfile",

@@ -70,6 +70,10 @@ fn immediate_cancellation_is_not_lost_before_worker_dispatch() {
     port.cancel();
     wait(&port, || !port.snapshot().busy);
     assert!(!port.snapshot().connected);
+    assert_ne!(
+        port.snapshot().message,
+        "Disconnecting and reaping owned processes…"
+    );
     assert!(port.snapshot().completed < 277);
     drop(engine);
 }
@@ -83,4 +87,21 @@ fn teardown_joins_a_running_scan_before_engine_drop_returns() {
     drop(engine);
     assert!(start.elapsed() < Duration::from_secs(10));
     assert!(!port.snapshot().busy);
+}
+
+#[test]
+fn rescan_limit_saves_and_reloads_from_settings() {
+    let (dir, engine, port) = start_engine("exit 0");
+    for limit in [1, 20] {
+        let mut preferences = port.snapshot().preferences;
+        preferences.retry_limit = limit;
+        port.send(Command::Save(preferences)).unwrap();
+        wait(&port, || !port.snapshot().busy);
+        assert!(port.snapshot().error.is_empty());
+        let saved: vmate_engine::model::Preferences =
+            serde_json::from_slice(&std::fs::read(dir.path().join("config/desktop.json")).unwrap())
+                .unwrap();
+        assert_eq!(saved.retry_limit, limit);
+    }
+    drop(engine);
 }

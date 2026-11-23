@@ -196,3 +196,38 @@ The Settings form has a bounded width and explicit non-stretching vertical flow.
   all-targets/all-features workspace clippy, rustfmt, shape/dups, changed-file
   comment/budget and diff guards passed. Final rebuilt binary regenerated all
   192 captures and passed native pointer/theme-save and tray lifecycle tests.
+
+## Session completion and Linux activation
+
+Branch fix/desktop-session-controls corrects stale Disconnecting presentation.
+Home now requires a busy operation before showing that label, and completion
+clears the cancellation message. Managed sessions observe NetworkManager UUID
+state every second; established teardown can finish when NM confirms inactive
+instead of waiting for a slow nmcli down client. Activation cancellation retains
+command completion before accepting inactivity. Unconfirmed cleanup remains an
+error; the app does not infer process ownership from unrelated OpenVPN PIDs.
+
+- Linux abstract Unix sockets serialize per-user desktop startup before engine
+  creation. A second launch signals the existing window; capture mode bypasses
+  ownership. A bounded timer accepts requests and checks peer UID. Socket lifetime
+  follows the event-loop timer, with no lockfile, detached worker or stale path.
+- Unknown relay context menus offer Look up country now. This explicit action can
+  request country metadata even if automatic lookup is disabled. It uses the
+  existing resolver/cache and a ten-second cancellation-aware deadline; country
+  updates do not change handshake success counters or timestamps.
+- Existing Settings rescan-loop limit remains 1–20. Boundary tests verify saved
+  JSON and exactly one/twenty rescan calls; no duplicate preference was added.
+- Home replaces the linear bar with a rotating arc around the power button.
+  Reduced motion freezes the arc; connected idle sessions do not show a spinner.
+- Isolated nmcli fixture: cancellation 0.316s despite an eight-second down client;
+  external disconnect 0.750s. Local Linux sandbox, debug build, commands:
+  `python3 tools/managed_smoke.py target/debug/vmate-cli`. Not live NM/VPN proof.
+- Native X11 pointer/theme-save/frame checks pass. Disposable D-Bus tray checks
+  now also launch a second process while hidden, verify successful exit, one
+  visible window and subsequent hide/reopen. No GNOME/KDE/Wayland claim.
+- Regenerated 192 captures in /home/user/session-review; inspected narrow light
+  Home: arc is outside the button, with no linear indicator or clipped label.
+- Final local gates: 178 workspace Rust tests, 12 packaging tests, strict
+  all-targets/all-features clippy, fmt, shape/dups, source comment/budget and
+  diff guards pass. Existing YAML artifact globs are not source block comments.
+  No push, release or main merge performed; live NM/polkit/egress remain untested.

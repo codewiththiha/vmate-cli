@@ -102,3 +102,11 @@ feature test modules until there are two real cross-feature callers.
   never infer countries from profile names or claim verified tunnel egress.
 - `apps/desktop/src/capture/tests/theme.rs`: actual rendered input contrast in
   both palettes at narrow/desktop widths, plus known/unknown connected labels.
+
+- `apps/desktop/src/instance.rs`: per-user Linux abstract socket ownership;
+  bounded UI-thread accepts reuse tray window activation, with peer UID checks.
+- `crates/vmate-engine/src/country.rs`: cancellable ten-second explicit country
+  lookup reuses IpInfoGeoLocator without scanning or opening a VPN tunnel.
+- `ConfigRepo::update_country`: metadata-only update, preserving success history.
+- `tools/managed_smoke.py`: isolated nmcli fixture for slow-down-command and
+  external-disconnect contracts; never a substitute for real VPN validation.

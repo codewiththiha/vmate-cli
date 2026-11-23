@@ -1,6 +1,7 @@
 //! Toolkit-independent application engine with one owned asynchronous worker.
 
 mod automatic;
+mod country;
 mod host;
 pub mod model;
 mod operations;

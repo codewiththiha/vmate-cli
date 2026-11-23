@@ -25,6 +25,17 @@ pub(super) fn bind(app: &AppWindow, port: &Port) {
             send(&p, &weak, Command::Connect(profile.uuid.to_string()));
         }
     });
+    let p = port.clone();
+    let weak = app.as_weak();
+    app.on_lookup_country(move |path| {
+        send(
+            &p,
+            &weak,
+            Command::LookupCountry {
+                path: path.to_string().into(),
+            },
+        );
+    });
     relay_actions(app, port);
     preferences(app, port);
 }

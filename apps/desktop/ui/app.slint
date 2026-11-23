@@ -22,6 +22,7 @@ export component AppWindow inherits Window {
     in property <bool> mac: false;
     in property <bool> fixture: false;
     in property <bool> busy: false;
+    out property <bool> stopping: root.busy && root.message == "Disconnecting and reaping owned processes…";
     in property <bool> connected: false;
     in property <int> completed;
     in property <int> total;
@@ -57,6 +58,7 @@ export component AppWindow inherits Window {
     callback connect-profile(int);
     callback import-relay;
     callback export-relay;
+    callback lookup-country(string);
     callback save;
     callback copy-command;
     callback quit;
@@ -104,12 +106,13 @@ export component AppWindow inherits Window {
                 if root.page == 6: Home { compact: root.width < 760px;
                     busy: root.busy; connected: root.connected; status: root.status;
                     completed: root.completed; total: root.total;
-                    stopping: root.message == "Disconnecting and reaping owned processes…";
+                    stopping: root.stopping;
                     connect => { root.auto-connect(); } cancel => { root.cancel(); }
                 }
                 if root.page == 0: RelayList { review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy && root.status == "Scanning"; operation-blocked: root.busy;
                     completed: root.completed; total: root.total;
                     scan => { root.scan(); } cancel => { root.cancel(); }
+                    lookup-country(path) => { root.lookup-country(path); }
                     import-relay => { root.import-relay(); } export-relay => { root.export-relay(); }
                 }
                 if root.page == 1: Connections { profiles: root.profiles; busy: root.busy; connected: root.connected;

@@ -50,6 +50,14 @@ pub(super) fn check(
         },
     );
     assert_eq!(app.get_status(), "Connected");
+    app.set_message("Disconnecting and reaping owned processes…".into());
+    app.set_busy(true);
+    assert!(app.get_stopping());
+    app.set_busy(false);
+    assert!(
+        !app.get_stopping(),
+        "An idle app must never display Disconnecting"
+    );
 }
 
 fn luminance(pixel: slint::Rgb8Pixel) -> f64 {

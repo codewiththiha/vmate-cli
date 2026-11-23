@@ -154,7 +154,7 @@ fn report(app: &slint::Weak<AppWindow>, active: bool, error: Option<String>) {
     });
 }
 
-fn reopen(app: &slint::Weak<AppWindow>, settings: bool) {
+pub(super) fn reopen(app: &slint::Weak<AppWindow>, settings: bool) {
     let _ = app.upgrade_in_event_loop(move |app| {
         if settings {
             app.set_page(4);

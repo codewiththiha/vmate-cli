@@ -15,6 +15,7 @@ export component RelayList inherits Rectangle {
     callback cancel;
     callback import-relay;
     callback export-relay;
+    callback lookup-country(string);
     background: Theme.paper;
     VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; padding: 16px; spacing: 12px;
         HorizontalBox { spacing: 12px;
@@ -44,6 +45,16 @@ export component RelayList inherits Rectangle {
                             border-width: focus.has-focus ? 2px : 0px;
                             border-color: Theme.pine;
                             hit := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.selected = index; } }
+                            ContextMenuArea {
+                                enabled: !root.operation-blocked;
+                                Menu {
+                                    if row.country == "" || row.country == "UNKNOWN": MenuItem {
+                                        title: "Look up country now";
+                                        activated => { root.lookup-country(row.path); }
+                                    }
+                                }
+                            }
+
                         }
                     }
                 }
