@@ -15,10 +15,12 @@ import tomllib
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output', type=Path)
+    parser.add_argument('--target', help='Override target for cross-platform notice verification')
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     host = next(line.split(': ', 1)[1] for line in subprocess.check_output(
         ['rustc', '-vV'], text=True).splitlines() if line.startswith('host:'))
+    host = args.target or host
     metadata = json.loads(subprocess.check_output(['cargo', 'metadata', '--locked',
         '--format-version', '1', '--filter-platform', host], text=True))
     tree = subprocess.check_output(['cargo', 'tree', '--workspace', '--locked',

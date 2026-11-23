@@ -39,7 +39,7 @@ def texts(package, root):
         raise RuntimeError(f'Missing source revision for {package["name"]}')
     revision = json.loads(identity.read_text())['git']['sha1']
     notices = upstream(package['repository'], revision)
-    text = '\n'.join(notices)
+    text = ' '.join('\n'.join(notices).split())
     declared = package['license'] or ''
     permitted = ('MIT' in declared and 'Permission is hereby granted, free of charge' in text
                  or 'Apache-2.0' in declared and 'Apache License' in text)
