@@ -9,9 +9,9 @@ on:
       release_tag:
         description: Desktop-only prerelease tag (must not start with v)
         type: string
-        default: desktop-v1.2.4-alpha.2
+        default: desktop-v1.2.4-alpha.3
   push:
-    branches: [main, feat/slint-desktop, fix/desktop-input-tray, fix/desktop-theme-countries, fix/desktop-session-controls, fix/desktop-settings-selection]
+    branches: [main, feat/slint-desktop, fix/desktop-input-tray, fix/desktop-theme-countries, fix/desktop-session-controls, fix/desktop-settings-selection, release/desktop-alpha3]
   pull_request:
     branches: [main]
 permissions:

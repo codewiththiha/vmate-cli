@@ -7,7 +7,7 @@ import tarfile
 import tempfile
 import time
 
-RELEASE = 2
+RELEASE = 3
 
 
 def root_owner(entry):

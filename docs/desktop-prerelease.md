@@ -4,17 +4,28 @@ Native Rust + Slint desktop preview, with the CLI included. Not a stable VPN
 release. Public VPN Gate relays are untrusted third parties; no privacy, DNS-leak,
 kill-switch, or uninterrupted-connectivity guarantee is made.
 
-## Changes in alpha.2
+## Changes in alpha.3
 
-- Removed the extra in-window menu strip and custom window-drag handler.
-- Linux native package revisions increase so package managers upgrade alpha.1.
-- Restored one system-owned title bar; content clicks no longer start window drags.
-- Added an opt-in Linux system tray icon in Settings, disabled by default.
-- With a working tray host, closing hides the window without stopping owned work.
-  Use the icon/menu to reopen, open Settings, or Quit. Without a host, closing
-  exits normally; host loss reopens the window to keep the app reachable.
-- Native X11 pointer navigation, text entry, Save and window-control tests pass.
-  Tray lifecycle tests use a disposable D-Bus host, not a GNOME/KDE desktop.
+- Unified custom and native-widget light/dark palettes. System, Light and Dark
+  appearance settings persist; country lookup defaults on while preserving opt-out.
+- Reworked Settings into General, Presets and Connection. Explicit preset
+  creation, assignments, validation, Save feedback and Discard replace implicit
+  creation. Settings can be saved without stopping an active VPN or scan.
+- Fixed stale Disconnecting presentation and observe managed NetworkManager
+  disconnection. Established teardown can finish once NM confirms inactivity.
+- Linux second launch reopens the existing window instead of creating an instance.
+- Added long-press/right-click multi-selection, Select all/Clear and batch export
+  with a destination dialog, filename preview and name/country/name_country styles.
+  Full country names changes JP to japan. Collisions never overwrite existing files.
+- Exports can run during a connection. Unknown relays have an explicit country
+  lookup action; displayed relay countries are metadata, not verified exit locations.
+- Saved tray mode keeps sessions running on close. Click reopens; the menu offers
+  Connect, Disconnect/Stop, Settings and Quit. Missing hosts keep a visible window.
+- Home uses an animated connect-button ring and respects reduced motion. The
+  existing 1–20 rescan limit is tested for persistence and exact enforcement.
+- Linux package revisions increase from 2 to 3 so package managers upgrade alpha.2.
+- Local gates include 181 Rust tests, 12 packaging tests and 216 rendered states.
+  Native X11/D-Bus lifecycle tests use isolated NM commands, not live tunnel proof.
 
 The tray requires a StatusNotifier/AppIndicator host. GNOME may need an extension.
 It does not replace the normal taskbar entry or add autostart. macOS tray support
