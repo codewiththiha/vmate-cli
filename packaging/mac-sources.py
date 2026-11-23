@@ -3,11 +3,29 @@
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
 import tarfile
 import urllib.request
+
+
+def retain_patches(recipe, destination):
+    directives = re.findall(r'^\s*patch\b[^\n]*', recipe, re.MULTILINE)
+    blocks = re.findall(r'^([ \t]*)patch(?: :p\d+)? do\n(.*?)^\1end\s*$',
+                        recipe, re.MULTILINE | re.DOTALL)
+    if len(directives) != len(blocks):
+        raise RuntimeError('Unreviewed Homebrew patch syntax')
+    for index, (_, block) in enumerate(blocks):
+        urls = re.findall(r'^\s*url "(https://[^"#]+)"\s*$', block, re.MULTILINE)
+        hashes = re.findall(r'^\s*sha256 "([a-f0-9]{64})"\s*$', block, re.MULTILINE)
+        if len(urls) != 1 or len(hashes) != 1:
+            raise RuntimeError('Patch must have one literal HTTPS URL and checksum')
+        data = urllib.request.urlopen(urls[0], timeout=120).read()
+        if hashlib.sha256(data).hexdigest() != hashes[0]:
+            raise RuntimeError(f'Patch checksum mismatch: {urls[0]}')
+        (destination / f'homebrew-{index}.patch').write_bytes(data)
 
 
 def main():
@@ -32,8 +50,7 @@ def main():
         if not recipe.exists():
             raise RuntimeError(f'Missing exact build recipe: {recipe}')
         recipe_text = recipe.read_text()
-        if 'patch do' in recipe_text or 'patch :' in recipe_text:
-            raise RuntimeError(f'External source patches need review: {name}')
+        retain_patches(recipe_text, destination)
         (destination / recipe.name).write_text(recipe_text)
         with tarfile.open(fileobj=io.BytesIO(data), mode='r:*') as archive:
             notices = [item for item in archive if item.isfile() and
