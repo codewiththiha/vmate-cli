@@ -279,3 +279,12 @@ repeat submissions and closing before accepted maintenance finishes.
   all-targets/all-features clippy, fmt, shape/dups, source comments/budget and diff
   guards pass. Final native session smoke also verifies export while connected.
   Changes remain local; no push, release or main merge is authorized/performed.
+
+## Alpha.3 hosted validation follow-up
+
+The first public-relay CI run found an outdated example wait after export became
+independent maintenance. desktop_probe still waited for busy=false and read the
+output before export finished, producing ENOENT. It now awaits exporting=false
+and retains error/deadline checks. The recorded public CLI sessions completed;
+this failure was in the engine-export validation probe, not evidence of success
+for the unfinished engine-scan/OpenVPN-2.7 checks. Rerun all checks before release.

@@ -48,10 +48,10 @@ fn main() -> Result<()> {
         path: relay.path.clone(),
         destination: export.clone(),
     })?;
-    while port.snapshot().busy && Instant::now() < deadline {
+    while port.snapshot().exporting && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(50));
     }
-    if port.snapshot().busy || !port.snapshot().error.is_empty() {
+    if port.snapshot().exporting || !port.snapshot().error.is_empty() {
         bail!("Export failed or timed out");
     }
     if std::fs::read(&export)? != std::fs::read(&relay.path)? {
