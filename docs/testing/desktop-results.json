@@ -1,0 +1,45 @@
+{
+  "rust_tests": 162,
+  "headless_scenarios": 14,
+  "sizes": [
+    [
+      1160,
+      770
+    ],
+    [
+      860,
+      740
+    ]
+  ],
+  "headless_images": 28,
+  "native_linux": {
+    "window_class": "vmate",
+    "taskbar_identity": "passed",
+    "minimize": "passed",
+    "maximize": "passed",
+    "close_exit_code": 0,
+    "network_operations": "none requested"
+  },
+  "local_packages": [
+    "linux-amd64-system.deb",
+    "linux-amd64-system.tar.gz",
+    "linux-amd64-bundled.deb",
+    "linux-amd64-bundled.tar.gz"
+  ],
+  "installer_tests": [
+    "private OpenVPN --version",
+    "checksums",
+    "local PREFIX installation",
+    "edition switching removes stale private executable",
+    "CLI launch",
+    "uninstall preserves user settings"
+  ],
+  "not_validated_locally": [
+    "macOS builds and native chrome",
+    "Wayland compositor",
+    "live NetworkManager authorization",
+    "macOS Tunnelblick authorization",
+    "internet egress"
+  ],
+  "public_release": false
+}

@@ -13,3 +13,6 @@ docs.md
 .claude/
 
 __pycache__/
+
+/review/
+/packages/

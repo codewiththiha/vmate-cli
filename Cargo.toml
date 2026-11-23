@@ -2,12 +2,16 @@
 resolver = "3"
 members = [
     "crates/vmate-core",
-    "crates/vmate-cli",
+    "apps/cli",
+    "crates/vmate-engine",
+    "apps/desktop",
 ]
+
+default-members = ["apps/cli"]
 
 [workspace.package]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.95"
 version = "1.2.4"
 license = "MIT"
 authors = ["codewiththiha <kt0071@gmail.com>"]
@@ -85,7 +89,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 
 # Terminal / UX
-ratatui = "0.29"
+ratatui = "0.30.2"
 crossterm = "0.28"
 indicatif = "0.17"
 comfy-table = "7"

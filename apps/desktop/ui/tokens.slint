@@ -1,0 +1,44 @@
+export global Theme {
+    out property <color> paper: #f8f7f3;
+    out property <color> surface: #ffffff;
+    out property <color> ink: #222c28;
+    out property <color> muted: #59665f;
+    out property <color> rule: #dcdfd8;
+    out property <color> pine: #20584a;
+    out property <color> tint: #e8eee8;
+    in-out property <bool> reduced-motion: false;
+}
+
+export component Action inherits Rectangle {
+    in property <string> label;
+    in property <bool> primary: false;
+    in property <bool> enabled: true;
+    callback clicked;
+    min-width: caption.preferred-width + 32px;
+    preferred-width: caption.preferred-width + 32px;
+    max-width: caption.preferred-width + 32px;
+    horizontal-stretch: 0;
+    height: 38px;
+    border-radius: 5px;
+    background: !root.enabled ? #e7e9e4 : root.primary ? (touch.has-hover ? #163e34 : Theme.pine) : touch.has-hover ? #e8eee8 : Theme.surface;
+    border-width: focus.has-focus ? 2px : 1px;
+    border-color: focus.has-focus ? #4a8374 : root.primary ? Theme.pine : Theme.rule;
+    animate background { duration: Theme.reduced-motion ? 0ms : 120ms; }
+    caption := Text { text: root.label; horizontal-alignment: center; vertical-alignment: center;
+        color: !root.enabled ? #78837c : root.primary ? #ffffff : Theme.ink; font-size: 14px; font-weight: 600; }
+    focus := FocusScope { enabled: root.enabled;
+        key-pressed(e) => { if (e.text == "\n" || e.text == " ") { root.clicked(); return accept; } return reject; }
+    }
+    touch := TouchArea { enabled: root.enabled; mouse-cursor: pointer;
+        clicked => { focus.focus(); root.clicked(); }
+    }
+    accessible-role: button;
+    accessible-label: root.label;
+    accessible-enabled: root.enabled;
+}
+
+export component SectionTitle inherits Text {
+    font-size: 12px; font-weight: 600; color: Theme.muted;
+}
+
+export component Rule inherits Rectangle { height: 1px; background: Theme.rule; }

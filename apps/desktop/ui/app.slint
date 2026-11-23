@@ -1,0 +1,157 @@
+import { VerticalBox, HorizontalBox, ScrollView, AboutSlint } from "std-widgets.slint";
+import { Theme, Action, Rule, SectionTitle } from "tokens.slint";
+import { RelayList, RelayRow } from "relay-list.slint";
+import { Connections, ProfileRow, Setup, Preferences } from "pages.slint";
+import { WindowControls } from "chrome.slint";
+export { RelayRow, ProfileRow }
+
+export component AppWindow inherits Window {
+    title: "vmate";
+    no-frame: !root.mac;
+    resize-border-width: root.mac ? 0px : 5px;
+    icon: @image-url("../assets/vmate.svg");
+    preferred-width: 1160px; preferred-height: 770px;
+    min-width: 820px; min-height: 650px;
+    background: Theme.paper;
+    default-font-size: 14px;
+    in-out property <int> page: 0;
+    in-out property <int> selected: -1;
+    in-out property <string> query;
+    callback filter-relays;
+    changed query => { root.selected = -1; root.filter-relays(); }
+    in property <bool> mac: false;
+    in property <bool> fixture: false;
+    in property <bool> busy: false;
+    in property <bool> connected: false;
+    in property <int> completed;
+    in property <int> total;
+    in property <[RelayRow]> relays;
+    in property <[ProfileRow]> profiles;
+    in property <string> status: "Not connected";
+    in property <string> message: "Ready when you are. Your system network is unchanged.";
+    in property <string> diagnostic;
+    in property <string> openvpn;
+    in property <string> service;
+    in property <string> install-command;
+    in property <string> activity;
+    in property <bool> review-scroll: false;
+    in-out property <string> workers: "64";
+    in-out property <string> timeout: "5";
+    in-out property <bool> reduced: false;
+    in-out property <bool> lookup: false;
+    callback scan;
+    callback cancel;
+    callback refresh;
+    callback connect-profile(int);
+    callback import-relay;
+    callback export-relay;
+    callback save;
+    callback copy-command;
+    callback quit;
+    callback drag-window;
+    changed reduced => { Theme.reduced-motion = root.reduced; }
+    MenuBar {
+        Menu { title: "vmate";
+            MenuItem { title: "Preferences"; activated => { root.page = 4; } }
+            MenuItem { title: "Quit vmate"; activated => { root.quit(); } }
+        }
+        Menu { title: "Connection";
+            MenuItem { title: "Scan relay library"; enabled: !root.busy; activated => { root.page = 0; root.scan(); } }
+            MenuItem { title: "Disconnect / stop"; enabled: root.busy; activated => { root.cancel(); } }
+        }
+        Menu { title: "Help";
+            MenuItem { title: "Setup and permissions"; activated => { root.page = 2; } }
+            MenuItem { title: "About vmate"; activated => { root.page = 5; } }
+        }
+    }
+    VerticalBox { spacing: 0px; padding: 0px;
+        if !root.mac: WindowControls {
+            minimize => { root.minimized = true; }
+            maximize => { root.maximized = !root.maximized; }
+            close => { root.quit(); }
+            drag => { root.drag-window(); }
+        }
+        if root.fixture: Rectangle { height: 26px; background: #f0e6cb;
+            Text { text: "DESIGN REVIEW FIXTURE · No live network operation"; color: #654b1d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
+        }
+        HorizontalBox { spacing: 0px;
+            Rectangle { width: 186px; background: #eef0e9;
+                VerticalBox { padding: 18px; spacing: 9px;
+                    HorizontalBox { height: 66px; spacing: 9px;
+                        Image { source: @image-url("../assets/vmate.svg"); width: 30px; height: 30px; }
+                        Text { text: "vmate"; font-size: 24px; font-weight: 700; color: Theme.ink; vertical-alignment: center; }
+                    }
+                    for label[index] in ["Relay library", "Connections", "Setup guide", "Activity", "Preferences"]: Rectangle {
+                        height: 43px; border-radius: 5px;
+                        background: root.page == index ? #dce5dc : nav.has-hover ? #e4e9e1 : transparent;
+                        Text { x: 12px; text: label; vertical-alignment: center; height: parent.height; color: root.page == index ? Theme.pine : Theme.muted; font-size: 14px; font-weight: root.page == index ? 600 : 400; }
+                        focus := FocusScope {
+                            key-pressed(e) => { if e.text == "\n" || e.text == " " { root.page = index; return accept; } return reject; }
+                        }
+                        border-width: focus.has-focus ? 2px : 0px;
+                        border-color: Theme.pine;
+                        nav := TouchArea { mouse-cursor: pointer; clicked => { focus.focus(); root.page = index; } }
+                    }
+                    Rectangle { vertical-stretch: 1; }
+                    Rule {}
+                    Text { text: root.connected ? "Connected via system VPN" : root.status; color: Theme.ink; font-weight: 600; font-size: 13px; wrap: word-wrap; }
+                    Text { text: "Local-first. No account.\nYour operating system\ncontrols VPN permissions."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
+                    Text { text: "DESKTOP PREVIEW / 1.2.4"; color: Theme.muted; font-size: 10px; }
+                }
+            }
+            VerticalBox { padding: 0px; spacing: 0px;
+                if root.diagnostic != "": Rectangle { min-height: 92px; background: #f7e8dd;
+                    VerticalBox { padding: 16px; spacing: 6px;
+                        Text { text: "Something needs your attention"; color: #773b21; font-weight: 600; font-size: 14px; }
+                        Text { text: root.diagnostic; color: #773b21; font-size: 13px; wrap: word-wrap; }
+                    }
+                }
+                if root.page == 0: RelayList { review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy;
+                    completed: root.completed; total: root.total;
+                    scan => { root.scan(); } cancel => { root.cancel(); }
+                    import-relay => { root.import-relay(); } export-relay => { root.export-relay(); }
+                }
+                if root.page == 1: Connections { profiles: root.profiles; busy: root.busy; connected: root.connected;
+                    mac: root.mac; status: root.status; message: root.message;
+                    connect-profile(index) => { root.connect-profile(index); }
+                    cancel => { root.cancel(); } refresh => { root.refresh(); } setup => { root.page = 2; }
+                }
+                if root.page == 2: Setup { review-scroll: root.review-scroll; openvpn: root.openvpn; service: root.service; mac: root.mac;
+                    install-command: root.install-command;
+                    refresh => { root.refresh(); } copy-command => { root.copy-command(); }
+                }
+                if root.page == 3: Rectangle { background: Theme.paper;
+                    VerticalBox { padding: 28px; spacing: 18px;
+                        Text { text: "Know what happened"; font-size: 27px; font-weight: 600; color: Theme.ink; }
+                        Text { text: "The latest 128 engine events. This is a local session log, not a traffic monitor."; color: Theme.muted; font-size: 14px; wrap: word-wrap; }
+                        Rule {}
+                        ScrollView { VerticalBox { padding: 0px; alignment: start;
+                            Text { text: root.activity == "" ? "No activity yet. Start a scan or check your setup." : root.activity;
+                                color: Theme.ink; font-size: 13px; font-family: "monospace"; wrap: word-wrap;
+                                horizontal-alignment: left; vertical-alignment: top; vertical-stretch: 0;
+                            }
+                            Rectangle { vertical-stretch: 1; }
+                        } }
+                    }
+                }
+                if root.page == 5: Rectangle { background: Theme.paper;
+                    VerticalBox { padding: 28px; spacing: 20px;
+                        Text { text: "vmate desktop"; color: Theme.ink; font-size: 27px; font-weight: 600; }
+                        Text { text: "1.2.4 · desktop preview branch"; color: Theme.muted; font-size: 14px; }
+                        Rule {}
+                        Text { text: "A local relay library and a careful bridge to your system VPN service.\nBuilt with Rust and Slint. No Swift, no webview, no account."; color: Theme.ink; font-size: 15px; wrap: word-wrap; }
+                        Text { text: "vmate source: MIT. Slint: Royalty-free Desktop, Mobile, and Web Applications License 2.0. Bundled OpenVPN and shared libraries retain their own terms. License notices ship with installation packages."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        HorizontalBox { AboutSlint { height: 130px; max-width: 300px; } Rectangle { horizontal-stretch: 1; } }
+                        Text { text: "No analytics are collected by this frontend. Relay-country lookup is an explicit preference; enabling it sends relay IPs to ipinfo.io. Public VPN relays are third parties: a handshake is not a privacy guarantee."; color: Theme.muted; font-size: 13px; wrap: word-wrap; }
+                        Rectangle { vertical-stretch: 1; }
+                    }
+                }
+                if root.page == 4: Preferences { workers <=> root.workers; timeout <=> root.timeout; reduced <=> root.reduced; lookup <=> root.lookup; save => { root.save(); } }
+                Rule {}
+                Rectangle { height: 45px; background: Theme.surface;
+                    Text { x: 24px; width: parent.width - 48px; height: parent.height; text: root.message; color: Theme.muted; font-size: 12px; overflow: elide; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+}

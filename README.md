@@ -11,6 +11,20 @@ from a keyboard-driven terminal UI backed by SQLite.
 > sweep (the behavior of the original Go tool) during connection switching and
 > shutdown.
 
+## Desktop preview branch
+
+- `apps/cli`: the existing CLI package; binary name remains vmate-cli.
+- `apps/desktop`: Rust + Slint GUI, no Swift and no webview.
+- `crates/vmate-engine`: toolkit-independent application commands and snapshots.
+- `crates/vmate-core`: shared VPN, storage and OS services.
+
+Run `cargo run -p vmate-desktop`. Headless review:
+`cargo run -p vmate-desktop -- --capture-dir review/screenshots`.
+See [installation and permission boundaries](docs/desktop-installation.md),
+[engine architecture](docs/architecture.md) and [licensing gates](docs/licensing-desktop.md).
+Desktop review CI builds Linux amd64/arm64 and macOS Intel/Apple Silicon system
+and bundled-OpenVPN editions. It creates artifacts only, not a public release.
+
 ---
 
 ## Features
@@ -29,7 +43,7 @@ from a keyboard-driven terminal UI backed by SQLite.
 
 ## Requirements
 
-- Rust **1.85+** (edition 2024)
+- Rust **1.95+** (edition 2024)
 - [OpenVPN](https://openvpn.net/) — `openvpn` on `PATH`, or pass `--openvpn-bin`
 - Root/sudo for raw `connect` and connecting `all` (OpenVPN needs root/`CAP_NET_ADMIN`
   to open `/dev/net/tun` or `utun`; scans use a null device without sudo.

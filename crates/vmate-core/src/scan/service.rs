@@ -182,10 +182,10 @@ fn prepare_paths(options: &ScanOptions) -> Result<Vec<PathBuf>> {
     }
     if options.modify {
         for path in &paths {
-            if options.backup {
-                if let Err(error) = std::fs::copy(path, backup_path(path)) {
-                    tracing::warn!(path = %path.display(), %error, "backup failed");
-                }
+            if options.backup
+                && let Err(error) = std::fs::copy(path, backup_path(path))
+            {
+                tracing::warn!(path = %path.display(), %error, "backup failed");
             }
             if let Err(error) = modify_config_cipher(path) {
                 tracing::warn!(path = %path.display(), %error, "cipher modification failed");

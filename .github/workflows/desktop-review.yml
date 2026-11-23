@@ -1,0 +1,73 @@
+name: desktop-review
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/slint-desktop]
+permissions:
+  contents: read
+jobs:
+  linux-review:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils
+      - run: python3 tools/shape_check.py --dups
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --workspace --locked
+      - run: cargo build -p vmate-desktop --locked
+      - run: target/debug/vmate-desktop --capture-dir review/screenshots
+      - run: python3 tools/review_screenshots.py review/screenshots
+      - run: xvfb-run -a python3 tools/native_smoke.py target/debug/vmate-desktop > review/native-linux.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slint-headless-review
+          path: review/
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            platform: linux
+            arch: arm64
+          - os: macos-15
+            platform: macos
+            arch: arm64
+          - os: macos-15-intel
+            platform: macos
+            arch: x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev libssl-dev liblzo2-dev liblz4-dev libcap-ng-dev patchelf pkg-config
+      - if: runner.os == 'macOS'
+        run: |
+          brew install openssl@3 lzo lz4 pkgconf dylibbundler cairo
+          python3 -m venv /tmp/vmate-icons
+          /tmp/vmate-icons/bin/pip install cairosvg
+          echo /tmp/vmate-icons/bin >> "$GITHUB_PATH"
+      - run: cargo test -p vmate-core -p vmate-engine --locked
+      - run: cargo build -p vmate-cli -p vmate-desktop --release --locked
+      - name: Stage both editions
+        run: |
+          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant system --binaries target/release --output packages
+          python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant bundled --binaries target/release --output packages
+      - name: Validate package contents and private executable
+        run: python3 tools/package_check.py packages
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}-review
+          path: packages/*

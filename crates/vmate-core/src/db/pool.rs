@@ -11,12 +11,11 @@ pub type DbPool = SqlitePool;
 
 /// Open (or create) the database, enable WAL mode and run pending migrations.
 pub async fn init_pool(db_path: &Path) -> Result<DbPool> {
-    if let Some(parent) = db_path.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).with_context(|| {
-                format!("cannot create database directory {}", parent.display())
-            })?;
-        }
+    if let Some(parent) = db_path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("cannot create database directory {}", parent.display()))?;
     }
 
     // The database is opened by path, not through a `sqlite://` URL: URL

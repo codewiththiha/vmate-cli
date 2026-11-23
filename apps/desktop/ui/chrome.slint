@@ -1,0 +1,32 @@
+import { HorizontalBox } from "std-widgets.slint";
+import { Theme } from "tokens.slint";
+
+export component WindowControls inherits Rectangle {
+    callback minimize;
+    callback maximize;
+    callback close;
+    callback drag;
+    height: 40px;
+    background: #eef0e9;
+    TouchArea {
+        mouse-cursor: default;
+        pointer-event(e) => { if e.kind == PointerEventKind.down && e.button == PointerEventButton.left { root.drag(); } }
+    }
+    HorizontalBox { padding: 0px; spacing: 0px;
+        Text { text: "vmate"; color: Theme.muted; font-size: 12px; vertical-alignment: center; horizontal-alignment: center; }
+        Rectangle { horizontal-stretch: 1; }
+        for label[index] in ["−", "□", "×"]: Rectangle {
+            width: 46px;
+            background: control.has-hover ? (index == 2 ? #b34a35 : #dce5dc) : transparent;
+            Text { text: label; font-size: index == 2 ? 23px : 18px;
+                color: control.has-hover && index == 2 ? white : Theme.ink;
+                horizontal-alignment: center; vertical-alignment: center;
+            }
+            accessible-role: button;
+            accessible-label: index == 0 ? "Minimize" : index == 1 ? "Maximize or restore" : "Close";
+            control := TouchArea { mouse-cursor: pointer;
+                clicked => { if index == 0 { root.minimize(); } else if index == 1 { root.maximize(); } else { root.close(); } }
+            }
+        }
+    }
+}

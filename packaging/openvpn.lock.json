@@ -1,0 +1,7 @@
+{
+  "version": "2.7.8",
+  "url": "https://swupdate.openvpn.org/community/releases/openvpn-2.7.8.tar.gz",
+  "sha256": "c070d1d2440b5a6fca6c2c68645c98cd492116ac36ef4f0946177115532c8e36",
+  "license": "GPL-2.0 with OpenSSL linking exception; see upstream COPYING",
+  "source_included": true
+}

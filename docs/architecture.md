@@ -1,9 +1,20 @@
 # Architecture and verification map
 
-The workspace has two crates: vmate-core owns VPN orchestration, persistence,
-config parsing and OS integration; vmate-cli owns flags, wiring and terminal UI.
-No UI, PDF renderer or parity-kit crate exists: those parts of the reference
-policy are inapplicable and must not be scaffolded.
+Application frontends live under apps/: cli and desktop (Rust + Slint).
+crates/vmate-core owns VPN orchestration, storage, parsing and OS integration.
+crates/vmate-engine composes application commands and bounded snapshots for the
+GUI. Neither engine crate imports Slint, window handles, dialogs or clipboard.
+The existing CLI calls core services directly; its terminal UI is not embedded
+in the desktop frontend. NetworkManager session ownership is shared in core.
+
+The engine Port is the replacement boundary for another GUI. Configuration
+injects storage and executable paths. One owned Tokio worker serializes commands;
+its 16-item channel rejects new work while busy. Cancellation bypasses that
+channel and is installed before dispatch. Shutdown/SIGTERM cancels the active
+operation, awaits core teardown and joins the worker thread. The GUI keeps the
+window visible during teardown. Failed managed teardown shows unconfirmed state,
+not a false disconnected guarantee. Snapshots cap relays at 500 and events at
+128 entries of at most 2048 characters. Diagnostic display caps at 8192 characters.
 
 Scan discovers paths, limits concurrent workers with a semaphore, launches
 OpenVPN probes, resolves countries and persists successful handshakes. Probe

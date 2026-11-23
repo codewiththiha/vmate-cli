@@ -202,10 +202,10 @@ struct QuitAfterRetries {
 #[async_trait]
 impl ConnectHost for QuitAfterRetries {
     async fn status(&mut self, s: &ConnectionStatus) -> Result<()> {
-        if let Some(rest) = s.message.split("(failure ").nth(1) {
-            if let Some(n) = rest.split('/').next().and_then(|n| n.parse::<usize>().ok()) {
-                self.failures_seen = self.failures_seen.max(n);
-            }
+        if let Some(rest) = s.message.split("(failure ").nth(1)
+            && let Some(n) = rest.split('/').next().and_then(|n| n.parse::<usize>().ok())
+        {
+            self.failures_seen = self.failures_seen.max(n);
         }
         Ok(())
     }

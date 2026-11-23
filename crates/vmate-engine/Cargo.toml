@@ -1,0 +1,20 @@
+[package]
+name = "vmate-engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+vmate-core = { path = "../vmate-core" }
+anyhow.workspace = true
+async-trait.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

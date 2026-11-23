@@ -48,13 +48,13 @@ impl GeoLocator for IpInfoGeoLocator {
         // Fast path: a country code embedded in the file name. Skipped for
         // built-ins, whose generated file names must never be mis-parsed as a
         // country code — their country is always resolved from the remote host.
-        if !crate::builtin::is_builtin_path(config) {
-            if let Some(code) = country_from_filename(config) {
-                return Ok(CountryLookup {
-                    country: code,
-                    source: CountrySource::FileName,
-                });
-            }
+        if !crate::builtin::is_builtin_path(config)
+            && let Some(code) = country_from_filename(config)
+        {
+            return Ok(CountryLookup {
+                country: code,
+                source: CountrySource::FileName,
+            });
         }
 
         let host = match parse_remote_host(config) {
@@ -157,10 +157,11 @@ pub async fn resolve_ip(host: &str) -> Option<String> {
 pub fn country_from_filename(config: &Path) -> Option<CountryCode> {
     let name = config.file_name()?.to_string_lossy().to_lowercase();
     for part in name.split(['_', '-', '.']) {
-        if part.len() == 2 && part.chars().all(|c| c.is_ascii_alphabetic()) {
-            if let Ok(code) = CountryCode::new(part) {
-                return Some(code);
-            }
+        if part.len() == 2
+            && part.chars().all(|c| c.is_ascii_alphabetic())
+            && let Ok(code) = CountryCode::new(part)
+        {
+            return Some(code);
         }
     }
     None

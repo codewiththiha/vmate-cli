@@ -1,0 +1,114 @@
+import { VerticalBox, HorizontalBox, LineEdit, CheckBox, ScrollView } from "std-widgets.slint";
+import { Theme, Action, Rule, SectionTitle } from "tokens.slint";
+export struct ProfileRow { name: string, uuid: string }
+
+export component Connections inherits Rectangle {
+    in property <[ProfileRow]> profiles;
+    in property <bool> busy;
+    in property <bool> connected;
+    in property <bool> mac;
+    in property <string> status;
+    in property <string> message;
+    in-out property <int> selected: -1;
+    callback connect-profile(int);
+    callback cancel;
+    callback refresh;
+    callback setup;
+    background: Theme.paper;
+    VerticalBox { padding: 28px; spacing: 22px;
+        Text { text: "Your connection, under your control"; font-size: 27px; font-weight: 600; color: Theme.ink; }
+        Rectangle { height: 154px; border-width: 1px; border-color: Theme.rule; border-radius: 6px; background: Theme.surface;
+            HorizontalBox { padding: 24px; spacing: 24px;
+                VerticalBox { spacing: 12px; alignment: center;
+                    SectionTitle { text: "SYSTEM VPN"; }
+                    Text { text: root.status; font-size: 30px; font-weight: 600; color: Theme.ink; }
+                    Text { text: root.message; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+                }
+                if root.busy: Action { label: root.connected ? "Disconnect" : "Cancel connection"; clicked => { root.cancel(); } }
+            }
+        }
+        HorizontalBox { SectionTitle { text: root.mac ? "EXISTING VPN APPLICATION" : "NETWORKMANAGER PROFILES"; } Action { label: "Refresh profiles"; enabled: !root.busy; clicked => { root.refresh(); } } }
+        Rule {}
+        if root.profiles.length == 0: VerticalBox { spacing: 14px;
+            Text { text: root.mac ? "Connect with your existing VPN app" : "No VPN profiles yet"; font-size: 21px; color: Theme.ink; font-weight: 600; }
+            Text { text: root.mac ? "Import a relay from the library into Tunnelblick. It handles macOS authorization and the tunnel. vmate does not report externally owned tunnels as connected." : "Scan the relay library, select a result and choose Import into system VPN. Your desktop authorization agent will handle any permission request."; font-size: 15px; color: Theme.muted; wrap: word-wrap; }
+            Action { label: "Review setup guide"; clicked => { root.setup(); } }
+            Rectangle { vertical-stretch: 1; }
+        }
+        if root.profiles.length > 0: ScrollView {
+            VerticalBox { spacing: 0px;
+                for profile[index] in root.profiles: Rectangle { height: 80px; background: Theme.surface;
+                    HorizontalBox { padding: 14px; spacing: 18px;
+                        VerticalBox { alignment: center; spacing: 5px;
+                            Text { text: profile.name; font-size: 16px; font-weight: 600; color: Theme.ink; overflow: elide; }
+                            Text { text: profile.uuid; font-size: 12px; color: Theme.muted; }
+                        }
+                        Action { label: "Connect"; primary: true; enabled: !root.busy; clicked => { root.connect-profile(index); } }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; width: parent.width; background: Theme.rule; }
+                }
+            }
+        }
+        Text { text: "vmate only disconnects sessions it starts. Already-active profiles are left alone."; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+    }
+}
+
+export component Setup inherits Rectangle {
+    in property <bool> review-scroll: false;
+    in property <string> openvpn;
+    in property <string> service;
+    in property <bool> mac;
+    callback refresh;
+    callback copy-command;
+    in property <string> install-command;
+    background: Theme.paper;
+    ScrollView { content-y: root.review-scroll ? min(0px, self.height - self.content-height) : 0px; VerticalBox { padding: 28px; spacing: 22px;
+        Text { text: "A clear path to your first connection"; font-size: 27px; font-weight: 600; color: Theme.ink; wrap: word-wrap; }
+        Text { text: "The app stays unprivileged. Your operating system authorizes VPN changes."; font-size: 15px; color: Theme.muted; wrap: word-wrap; }
+        Rule {}
+        SectionTitle { text: "01 / CHECK THE OPENVPN EXECUTABLE"; }
+        Text { text: root.openvpn; font-size: 15px; color: Theme.ink; wrap: word-wrap; }
+        Text { text: "The bundled edition includes a private OpenVPN executable. The system edition uses your installed version. Neither silently grants network privileges."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+        SectionTitle { text: "02 / PREPARE YOUR SYSTEM SERVICE"; }
+        Text { text: root.service; font-size: 15px; color: Theme.ink; wrap: word-wrap; }
+        Rectangle { min-height: 80px; background: Theme.tint; border-radius: 4px;
+            HorizontalBox { padding: 16px; spacing: 16px;
+                Text { text: root.install-command; font-size: 13px; font-family: "monospace"; color: Theme.pine; wrap: word-wrap; }
+                Action { label: "Copy instructions"; clicked => { root.copy-command(); } }
+            }
+        }
+        Text { text: root.mac ? "Install and open Tunnelblick from its official website. Import a relay from vmate, then approve its system authorization prompt. Gatekeeper may require an explicitly approved signed distribution. Do not disable Gatekeeper globally." : "Install the OpenVPN plugin and keep a desktop polkit agent running. Import a relay in the library, then choose its profile in Connections. If authorization is denied, contact your administrator; vmate never installs a blanket sudoers rule."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+        SectionTitle { text: "03 / VERIFY, THEN CONNECT"; }
+        Text { text: "Run a scan without sudo. A successful handshake means the relay answered, not that internet traffic or DNS is protected. Connect through your system service and verify your network before relying on it."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
+        HorizontalBox { Action { label: "Check setup again"; primary: true; clicked => { root.refresh(); } } Rectangle { horizontal-stretch: 1; } }
+        Text { text: "Need a terminal-only workflow? vmate-cli remains available. Raw connections require explicit elevation; the graphical app never asks you to run it as root."; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
+    } }
+}
+
+export component Preferences inherits Rectangle {
+    in-out property <string> workers: "64";
+    in-out property <string> timeout: "5";
+    in-out property <bool> reduced;
+    in-out property <bool> lookup;
+    callback save;
+    background: Theme.paper;
+    VerticalBox { padding: 28px; spacing: 22px;
+        Text { text: "Make it work your way"; font-size: 27px; font-weight: 600; color: Theme.ink; }
+        Text { text: "Desktop preferences apply to your next scan. CLI defaults are unchanged."; font-size: 14px; color: Theme.muted; }
+        Rule {}
+        HorizontalBox { spacing: 30px;
+            VerticalBox { spacing: 8px; Text { text: "Concurrent probes"; font-size: 15px; font-weight: 600; color: Theme.ink; } Text { text: "64 is a practical starting point. Higher values use more memory,\nCPU, bandwidth and descriptors. Allowed range: 1–500."; font-size: 13px; color: Theme.muted; wrap: word-wrap; } }
+            LineEdit { height: 38px; vertical-stretch: 0; text <=> root.workers; input-type: number; max-width: 100px; }
+        }
+        HorizontalBox { spacing: 30px;
+            VerticalBox { spacing: 8px; Text { text: "Handshake timeout"; font-size: 15px; font-weight: 600; color: Theme.ink; } Text { text: "Seconds per relay, from 1 to 120. Slow relays may need longer."; font-size: 13px; color: Theme.muted; wrap: word-wrap; } }
+            LineEdit { height: 38px; vertical-stretch: 0; text <=> root.timeout; input-type: number; max-width: 100px; }
+        }
+        Rule {}
+        CheckBox { text: "Reduce interface motion"; checked <=> root.reduced; }
+        CheckBox { text: "Look up relay countries using ipinfo.io"; checked <=> root.lookup; }
+        Text { text: "Off by default. When enabled, relay IP addresses are sent to ipinfo.io.\nNo traffic statistics are invented or sent by this interface."; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
+        HorizontalBox { Action { label: "Save preferences"; primary: true; clicked => { root.save(); } } Rectangle { horizontal-stretch: 1; } }
+        Rectangle { vertical-stretch: 1; }
+    }
+}

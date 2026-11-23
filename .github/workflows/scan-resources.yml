@@ -10,7 +10,7 @@ on:
       - tools/input_latency.py
       - tools/linux_state.py
       - crates/vmate-core/src/ovpn/**
-      - crates/vmate-cli/src/ui/input.rs
+      - apps/cli/src/ui/input.rs
 
 permissions:
   contents: read

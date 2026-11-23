@@ -6,3 +6,5 @@ pub mod monitor;
 pub mod parser;
 pub mod policy;
 pub mod process;
+
+pub mod binary;

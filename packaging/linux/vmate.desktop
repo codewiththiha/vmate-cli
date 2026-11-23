@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=vmate
+Comment=OpenVPN relay library and system VPN connections
+Exec=vmate-desktop
+Icon=vmate
+Terminal=false
+Categories=Network;Utility;
+StartupNotify=true
+StartupWMClass=vmate
+Keywords=VPN;OpenVPN;Network;

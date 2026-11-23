@@ -27,3 +27,5 @@ pub mod system;
 pub use country::{CountryCode, CountryError};
 pub use error::ParseError;
 pub use filter::CountryFilter;
+
+pub mod managed;

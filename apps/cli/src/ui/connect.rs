@@ -124,10 +124,10 @@ impl ConnectTui {
         // Expire a stale overlay, then render: a fresh transient overrides the
         // status message; once connected the confirmation fades to empty;
         // connecting/reconnecting statuses stay persistent.
-        if let Some(t) = &self.transient {
-            if t.shown_at.elapsed() >= MESSAGE_TTL {
-                self.transient = None;
-            }
+        if let Some(t) = &self.transient
+            && t.shown_at.elapsed() >= MESSAGE_TTL
+        {
+            self.transient = None;
         }
         let message = match &self.transient {
             Some(t) => t.text.clone(),

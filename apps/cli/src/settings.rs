@@ -34,7 +34,9 @@ impl Settings {
 
         Ok(Settings {
             db_path,
-            openvpn_bin: cli.openvpn_bin.clone(),
+            openvpn_bin: vmate_core::ovpn::binary::resolve(Some(&cli.openvpn_bin))?
+                .to_string_lossy()
+                .into(),
             killall_enabled: cli.killall,
             no_elevate: cli.no_elevate,
             ipinfo_token: cli.ipinfo_token.clone(),

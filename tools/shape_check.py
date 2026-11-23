@@ -33,7 +33,7 @@ def main():
     errors, bodies = [], {}
     for name in paths:
         path = ROOT / name
-        if path.suffix not in {'.rs', '.py', '.md', '.yml', '.toml', '.sh'}:
+        if path.suffix not in {'.rs', '.py', '.md', '.yml', '.toml', '.sh', '.slint'}:
             continue
         if name in baseline.get('exempt', {}):
             continue

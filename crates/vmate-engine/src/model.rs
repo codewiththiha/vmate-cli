@@ -1,0 +1,89 @@
+//! Frontend-neutral application state; no toolkit or window handles.
+
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+/// A stored handshake result, never proof of a connected system VPN.
+#[derive(Clone, Debug, Default)]
+pub struct Relay {
+    pub path: PathBuf,
+    pub country: String,
+    pub name: String,
+    pub checked: String,
+}
+
+/// Existing system VPN identity; the UUID is the activation key.
+#[derive(Clone, Debug)]
+pub struct Profile {
+    pub uuid: String,
+    pub name: String,
+}
+
+/// Persistent desktop preferences, separate from CLI defaults.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Preferences {
+    pub workers: usize,
+    pub timeout: u64,
+    pub reduced_motion: bool,
+    pub country_lookup: bool,
+}
+
+impl Default for Preferences {
+    fn default() -> Self {
+        Self {
+            workers: 64,
+            timeout: 5,
+            reduced_motion: false,
+            country_lookup: false,
+        }
+    }
+}
+
+/// One bounded, internally consistent view of the engine.
+#[derive(Clone, Debug)]
+pub struct Snapshot {
+    pub status: String,
+    pub message: String,
+    pub error: String,
+    pub busy: bool,
+    pub connected: bool,
+    pub completed: usize,
+    pub total: usize,
+    pub relays: Vec<Relay>,
+    pub profiles: Vec<Profile>,
+    pub events: Vec<String>,
+    pub openvpn: String,
+    pub system_service: String,
+    pub preferences: Preferences,
+}
+
+impl Default for Snapshot {
+    fn default() -> Self {
+        Self {
+            status: "Not connected".into(),
+            message: "Scan for relays, then connect through your system VPN service.".into(),
+            error: String::new(),
+            busy: false,
+            connected: false,
+            completed: 0,
+            total: 0,
+            relays: Vec::new(),
+            profiles: Vec::new(),
+            events: Vec::new(),
+            openvpn: "Checking OpenVPN…".into(),
+            system_service: "Checking system VPN service…".into(),
+            preferences: Preferences::default(),
+        }
+    }
+}
+
+/// Explicit, validated user intent accepted by the application engine.
+#[derive(Clone, Debug)]
+pub enum Command {
+    Refresh,
+    Scan,
+    Connect(String),
+    Export { path: PathBuf, destination: PathBuf },
+    Import { path: PathBuf },
+    Save(Preferences),
+}
