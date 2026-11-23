@@ -48,7 +48,7 @@ def arch(args, stage):
 def rpm(args, stage):
     architecture = {'amd64': 'x86_64', 'arm64': 'aarch64'}[args.arch]
     dependencies = ['glibc >= 2.39', 'fontconfig', 'libxkbcommon', 'libxkbcommon-x11',
-                    'libX11', 'libxcb', 'libXcursor', 'libXrandr', 'libXi', 'wayland-libs-client']
+                    'libX11', 'libxcb', 'libXcursor', 'libXrandr', 'libXi', 'libwayland-client']
     if args.variant == 'system':
         dependencies.append('openvpn')
     with tempfile.TemporaryDirectory() as temporary:

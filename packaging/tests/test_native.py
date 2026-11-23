@@ -47,6 +47,8 @@ class NativeMetadata(unittest.TestCase):
             package = base / (stage.name + '.rpm')
             result = subprocess.check_output(['rpm', '-qp', '--requires', str(package)], text=True)
             self.assertNotIn('openvpn', result.lower())
+            self.assertIn('libwayland-client', result)
+            self.assertNotIn('wayland-libs-client', result)
             name = subprocess.check_output(['rpm', '-qp', '--queryformat', '%{NAME}', str(package)], text=True)
             self.assertEqual(name, 'vmate-bundled')
 
