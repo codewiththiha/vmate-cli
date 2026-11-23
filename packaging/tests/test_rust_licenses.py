@@ -33,6 +33,12 @@ class RustNotices(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'require review'):
                     LICENSES.texts(package, Path(directory))
 
+    def test_unlicense_is_retained_from_the_crate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'UNLICENSE').write_text('This is free and unencumbered software')
+            self.assertIn('free and unencumbered', LICENSES.texts({'name': 'ksni'}, root)[0])
+
     def test_line_wrapped_grant_is_not_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             package = self.fixture(Path(directory), 'a' * 40)

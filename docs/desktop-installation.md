@@ -1,6 +1,6 @@
 # Desktop installation and authorization
 
-This branch adds a Slint desktop preview, an experimental prerelease, not a stable signed release.
+This branch adds an experimental Slint desktop, not a stable signed release.
 The GUI is Rust + Slint; there is no Swift application or embedded webview.
 
 ## Editions
@@ -20,8 +20,17 @@ as your user. The tar installer defaults to ~/.local and registers the launcher,
 icon and CLI. `install.sh --uninstall` removes app files, not user settings or
 system VPN profiles. Do not install system and bundled editions simultaneously.
 Launch vmate from the desktop application menu; pin it to the taskbar if wanted.
-Linux has custom right-aligned minimize/maximize/close controls; the compositor
-still owns the window. Menu integration varies across desktop environments.
+The system owns the title bar, resize borders and window controls. There is no
+extra in-window menu strip or client-area window-drag handler.
+
+Settings → Show system tray icon is off by default. Save to enable it. With an
+available StatusNotifier/AppIndicator host, closing hides only the window; scans
+or connections continue. Click the tray icon or choose Open vmate to return.
+Its menu also offers Settings and Quit vmate. Quit cancels owned work and exits.
+Disabling the setting unregisters the icon. Without a working tray host, closing
+exits normally; loss of the host reopens the window so vmate cannot become hidden
+and unreachable. GNOME may require an AppIndicator extension; KDE usually has a
+host. This does not control normal taskbar visibility or install an autostart job.
 
 Setup detects Arch/Manjaro, Fedora and Debian-family package instructions.
 Install NetworkManager's OpenVPN plugin and run your desktop polkit agent.
@@ -40,7 +49,8 @@ binaries. Old root-owned config caches may require the documented one-time chown
 
 Packages: separate Apple Silicon and Intel .dmg images with vmate.app, plus a
 CLI-accessible app archive. Drag vmate.app to Applications; launch through Finder
-or the Dock. Native traffic lights and the native application menu are retained.
+or the Dock. Native traffic lights are retained. Navigation and About live inside the app.
+The optional system tray setting currently applies only to Linux.
 CLI binary: /Applications/vmate.app/Contents/MacOS/vmate-cli.
 
 The GUI delegates OpenVPN connection authorization to an existing Tunnelblick
@@ -61,7 +71,7 @@ Signing credentials and real Mac validation are release gates, not simulated.
 Slint component with the software renderer, without DISPLAY or network access.
 Every screenshot has a fixture banner. It covers every page, busy/empty/connected
 states and missing-dependency/authorization failures at desktop and compact sizes.
-Native macOS decorations are not captured by this headless content renderer.
+Native system decorations are not captured by this headless content renderer.
 Engine tests use isolated storage and shell fixtures, not public VPN traffic.
 
 Slint 1.19 needs Rust 1.95; workspace development uses current stable. See

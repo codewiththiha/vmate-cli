@@ -1,5 +1,7 @@
 # vmate-cli
 
+[![Made with Slint](docs/assets/made-with-slint.png)](https://slint.dev)
+
 A fast, interactive OpenVPN config **scanner**, **tester** and **connector** for
 the command line. It finds `.ovpn` files on disk, tests them concurrently,
 remembers which ones work, and lets you connect, switch and copy configs — all

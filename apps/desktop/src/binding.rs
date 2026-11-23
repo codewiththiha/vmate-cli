@@ -10,15 +10,6 @@ use vmate_engine::{Port, model::Snapshot};
 
 pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
     app.set_mac(cfg!(target_os = "macos"));
-    let weak = app.as_weak();
-    app.on_drag_window(move || {
-        use slint::winit_030::WinitWindowAccessor;
-        if let Some(app) = weak.upgrade() {
-            app.window().with_winit_window(|window| {
-                let _ = window.drag_window();
-            });
-        }
-    });
     app.set_install_command(setup_instructions().into());
     actions::bind(app, &port);
     let p = port.clone();
@@ -29,6 +20,8 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
         }
     });
     let closing = actions::closing(app, &port);
+    #[cfg(target_os = "linux")]
+    let mut tray = crate::tray::Session::new(app.as_weak());
     let weak = app.as_weak();
     let timer = slint::Timer::default();
     let mut previous = String::new();
@@ -41,6 +34,7 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
             let snapshot = port.snapshot();
             if (closing.get() || port.is_shutting_down()) && !snapshot.busy {
                 let _ = app.hide();
+                let _ = slint::quit_event_loop();
                 return;
             }
             let preference_key = format!("{:?}", snapshot.preferences);
@@ -48,6 +42,8 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
                 settings::apply(&app, &snapshot.preferences);
                 preferences = preference_key;
             }
+            #[cfg(target_os = "linux")]
+            tray.set_enabled(snapshot.preferences.tray_enabled);
             let signature = format!("{:?}", snapshot);
             if signature != previous {
                 apply(&app, &snapshot);

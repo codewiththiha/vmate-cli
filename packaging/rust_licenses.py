@@ -14,7 +14,7 @@ def upstream(repository, revision):
     repository = repository.removeprefix('https://github.com/').rstrip('/').removesuffix('.git')
     notices = []
     for filename in ('LICENSE-MIT', 'LICENSE-APACHE', 'LICENSE', 'LICENSE.txt',
-                     'LICENCE', 'LICENCE.txt', 'LICENSE.md', 'COPYING', 'LICENSES/MIT.txt', 'LICENSES/Apache-2.0.txt', 'NOTICE'):
+                     'LICENCE', 'LICENCE.txt', 'LICENSE.md', 'COPYING', 'LICENSES/MIT.txt', 'LICENSES/Apache-2.0.txt', 'NOTICE', 'UNLICENSE'):
         url = f'https://raw.githubusercontent.com/{repository}/{revision}/{filename}'
         try:
             text = urllib.request.urlopen(url, timeout=30).read().decode()
@@ -29,7 +29,7 @@ def upstream(repository, revision):
 def texts(package, root):
     notices = []
     for path in sorted(root.rglob('*')):
-        if path.is_file() and path.name.upper().startswith(('LICENSE', 'COPYING', 'NOTICE')):
+        if path.is_file() and path.name.upper().startswith(('LICENSE', 'COPYING', 'NOTICE', 'UNLICENSE')):
             if path.stat().st_size > 2_000_000:
                 raise RuntimeError(f'Unexpected notice size: {path}')
             notices.append(f'{path.relative_to(root)}\n{path.read_text(errors="replace")}')

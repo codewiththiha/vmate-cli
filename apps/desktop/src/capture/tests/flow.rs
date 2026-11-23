@@ -81,7 +81,7 @@ fn exercise_scan(
     window.draw_if_needed(|renderer| {
         renderer.render(pixels, 1160);
     });
-    click(1080.0, if app.get_mac() { 117.0 } else { 157.0 });
+    click(1080.0, 77.0);
     assert!(
         port.snapshot().busy,
         "actual Slint callback must submit a scan to the actor"
@@ -106,7 +106,7 @@ fn exercise_scan(
 
 pub(super) fn brand_alignment(pixels: &[slint::Rgb8Pixel]) {
     let bounds = |left: usize, right: usize| {
-        let rows: Vec<usize> = (130..185)
+        let rows: Vec<usize> = (65..96)
             .filter(|y| {
                 (left..right).any(|x| {
                     let pixel = pixels[y * 1160 + x];

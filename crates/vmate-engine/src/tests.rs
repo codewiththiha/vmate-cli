@@ -74,3 +74,16 @@ fn presets_require_unique_names_valid_assignments_and_bounded_loops() {
     assert_eq!(loaded.connect_preset, "Default");
     assert_eq!(loaded.retry_limit, 2);
 }
+
+#[test]
+fn tray_is_opt_in_and_round_trips_without_breaking_old_preferences() {
+    let old: model::Preferences = serde_json::from_str("{}").unwrap();
+    assert!(!old.tray_enabled);
+    let enabled = model::Preferences {
+        tray_enabled: true,
+        ..old
+    };
+    let loaded: model::Preferences =
+        serde_json::from_slice(&serde_json::to_vec(&enabled).unwrap()).unwrap();
+    assert!(loaded.tray_enabled);
+}

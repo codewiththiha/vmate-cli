@@ -2,15 +2,13 @@ import { VerticalBox, HorizontalBox, ScrollView, AboutSlint } from "std-widgets.
 import { Theme, Action, Rule, SectionTitle } from "tokens.slint";
 import { RelayList, RelayRow } from "relay-list.slint";
 import { Connections, ProfileRow, Setup } from "pages.slint";
-import { WindowControls } from "chrome.slint";
 import { Settings } from "settings.slint";
 import { Home } from "home.slint";
 export { RelayRow, ProfileRow }
 
 export component AppWindow inherits Window {
     title: "vmate";
-    no-frame: !root.mac;
-    resize-border-width: root.mac ? 0px : 5px;
+    no-frame: false;
     icon: @image-url("../assets/vmate.svg");
     preferred-width: 1160px; preferred-height: 770px;
     min-width: 480px; min-height: 600px;
@@ -59,31 +57,10 @@ export component AppWindow inherits Window {
     callback save;
     callback copy-command;
     callback quit;
-    callback drag-window;
+    in-out property <bool> tray-enabled: false;
+    in property <bool> tray-active: false;
     changed reduced => { Theme.reduced-motion = root.reduced; }
-    MenuBar {
-        Menu { title: "vmate";
-            MenuItem { title: "Preferences"; activated => { root.page = 4; } }
-            MenuItem { title: "Quit vmate"; activated => { root.quit(); } }
-        }
-        Menu { title: "Connection";
-            MenuItem { title: "System profiles"; activated => { root.page = 1; } }
-            MenuItem { title: "Activity"; activated => { root.page = 3; } }
-            MenuItem { title: "Scan relay library"; enabled: !root.busy; activated => { root.page = 0; root.scan(); } }
-            MenuItem { title: "Disconnect / stop"; enabled: root.busy; activated => { root.cancel(); } }
-        }
-        Menu { title: "Help";
-            MenuItem { title: "Setup and permissions"; activated => { root.page = 2; } }
-            MenuItem { title: "About vmate"; activated => { root.page = 5; } }
-        }
-    }
     VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; spacing: 0px; padding: 0px;
-        if !root.mac: WindowControls {
-            minimize => { root.minimized = true; }
-            maximize => { root.maximized = !root.maximized; }
-            close => { root.quit(); }
-            drag => { root.drag-window(); }
-        }
         if root.fixture: Rectangle { height: 26px; background: #f0e6cb;
             Text { text: "DESIGN REVIEW FIXTURE · No live network operation"; color: #654b1d; font-size: 11px; horizontal-alignment: center; vertical-alignment: center; }
         }
@@ -109,8 +86,8 @@ export component AppWindow inherits Window {
                     }
                     Rectangle { vertical-stretch: 1; }
                     Rule {}
-
-
+                    Action { label: "About / help"; clicked => { root.page = 5; } }
+                    Action { label: "Quit vmate"; clicked => { root.quit(); } }
                     Text { text: "DESKTOP PREVIEW / 1.2.4"; color: Theme.muted; font-size: 10px; }
                 }
             }
@@ -167,7 +144,7 @@ export component AppWindow inherits Window {
                         Rectangle { vertical-stretch: 1; }
                     }
                 } }
-                if root.page == 4: Settings { review-scroll: root.review-scroll;
+                if root.page == 4: Settings { mac: root.mac; tray-enabled <=> root.tray-enabled; tray-active: root.tray-active; review-scroll: root.review-scroll;
                     names: root.preset-names; editing <=> root.editing-preset;
                     name <=> root.preset-name; scan-index <=> root.scan-index; connect-index <=> root.connect-index;
                     select-preset(index) => { root.select-preset(index); } auto-reconnect <=> root.auto-reconnect; retry-limit <=> root.retry-limit; busy: root.busy; workers <=> root.workers; timeout <=> root.timeout; reduced <=> root.reduced; lookup <=> root.lookup; save => { root.save(); } }
@@ -178,7 +155,7 @@ export component AppWindow inherits Window {
         if root.width < 760px: HorizontalBox { padding: 12px; spacing: 12px;
             Action { label: "Home"; primary: root.page == 6; clicked => { root.page = 6; } }
             Action { label: "Relays"; primary: root.page == 0; clicked => { root.page = 0; } }
-            Rectangle { horizontal-stretch: 1; }
+            Action { label: "About"; clicked => { root.page = 5; } }
             Action { label: "Settings"; primary: root.page == 4; clicked => { root.page = 4; } }
         }
     }

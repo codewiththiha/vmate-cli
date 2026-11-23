@@ -37,3 +37,8 @@ For dispatch 0.2.0, the declared MIT license and author are checked exactly,
 and a reconstructed MIT notice is explicitly identified as such. Other
 unreviewed notice omissions still fail closed. See packaging/licenses for
 provenance; no independent legal audit is asserted.
+
+The public README displays the official Slint attribution badge, retained from
+v1.19.0, in addition to the AboutSlint widget reached from About / help. This
+preserves the badge attribution option without an extra in-window menu bar.
+The notice collector recognizes UNLICENSE files, including ksni.

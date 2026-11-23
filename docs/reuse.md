@@ -86,3 +86,10 @@ feature test modules until there are two real cross-feature callers.
   distribution installation checks; not live VPN or authorization tests.
 - `tools/publish_desktop.py`: validates every edition and checksum before exposing
   a draft as an explicitly requested desktop prerelease; never stable CLI tags.
+
+- `apps/desktop/src/tray.rs`: optional Linux StatusNotifier lifecycle, bounded
+  worker channel and UI-thread handoff; native window manager owns all dragging.
+- `tools/tray_smoke.py`: real app close/reopen/quit/disable/host-loss contracts
+  against a disposable D-Bus host; not proof of GNOME/KDE/Wayland integration.
+- `tools/native_smoke.py`: real X11 pointer navigation, text entry and saved
+  settings, body-drag rejection, native title-bar maximize, minimize and close.

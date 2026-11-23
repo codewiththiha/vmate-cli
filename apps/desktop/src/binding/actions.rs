@@ -112,11 +112,19 @@ pub(super) fn closing(app: &AppWindow, port: &Port) -> std::rc::Rc<std::cell::Ce
             && let Some(app) = weak.upgrade()
         {
             let _ = app.hide();
+            let _ = slint::quit_event_loop();
         }
     });
     let flag = closing.clone();
     let p = port.clone();
+    let weak = app.as_weak();
     app.window().on_close_requested(move || {
+        if let Some(app) = weak.upgrade()
+            && app.get_tray_active()
+        {
+            let _ = app.hide();
+            return slint::CloseRequestResponse::KeepWindowShown;
+        }
         flag.set(true);
         p.cancel();
         if p.snapshot().busy {

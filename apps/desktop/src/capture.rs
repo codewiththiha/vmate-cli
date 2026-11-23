@@ -88,12 +88,12 @@ mod tests {
                 button: PointerEventButton::Left,
             });
         };
-        click(1080.0, 165.0);
+        click(1080.0, 77.0);
         assert!(
             clicked.get(),
             "primary scan control must accept pointer activation"
         );
-        click(80.0, 323.0);
+        click(80.0, 248.0);
         assert_eq!(app.get_page(), 1, "sidebar must navigate to Connections");
         fixtures::apply(&app, "connected-library");
         clicked.set(false);
@@ -101,7 +101,7 @@ mod tests {
         window.draw_if_needed(|renderer| {
             renderer.render(&mut pixels, 1160);
         });
-        click(1080.0, 165.0);
+        click(1080.0, 77.0);
         assert!(
             !clicked.get(),
             "library scan must stay disabled during a VPN connection"
@@ -134,7 +134,7 @@ mod tests {
             window.draw_if_needed(|renderer| {
                 renderer.render(pixels, 1160);
             });
-            click(660.0, 400.0);
+            click(660.0, 316.0);
         }
         assert_eq!(connects.get(), 1, "idle Home starts one automatic workflow");
         assert_eq!(

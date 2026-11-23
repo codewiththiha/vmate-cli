@@ -11,7 +11,7 @@ on:
         type: string
         default: desktop-v1.2.4-alpha.1
   push:
-    branches: [main, feat/slint-desktop]
+    branches: [main, feat/slint-desktop, fix/desktop-input-tray]
   pull_request:
     branches: [main]
 permissions:
@@ -25,7 +25,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils
+      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils dbus-x11 python3-venv
       - run: python3 -m unittest discover -s packaging/tests -v
       - run: python3 tools/shape_check.py --dups
       - run: cargo fmt --check
@@ -37,6 +37,11 @@ jobs:
       - run: target/debug/vmate-desktop --capture-dir review/screenshots
       - run: python3 tools/review_screenshots.py review/screenshots
       - run: xvfb-run -a python3 tools/native_smoke.py target/debug/vmate-desktop > review/native-linux.json
+      - name: Real tray lifecycle against a disposable D-Bus host
+        run: |
+          python3 -m venv /tmp/vmate-tray-tests
+          /tmp/vmate-tray-tests/bin/pip install dbus-next==0.2.3
+          dbus-run-session -- xvfb-run -a /tmp/vmate-tray-tests/bin/python tools/tray_smoke.py target/debug/vmate-desktop > review/tray-linux.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:

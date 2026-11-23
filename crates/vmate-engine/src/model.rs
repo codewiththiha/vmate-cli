@@ -30,6 +30,8 @@ pub struct Preferences {
     pub retry_limit: u32,
     pub reduced_motion: bool,
     pub country_lookup: bool,
+    /// Opt-in desktop system tray; older preferences default to disabled.
+    pub tray_enabled: bool,
 }
 
 impl Default for Preferences {
@@ -42,6 +44,7 @@ impl Default for Preferences {
             retry_limit: 3,
             reduced_motion: false,
             country_lookup: false,
+            tray_enabled: false,
         }
     }
 }

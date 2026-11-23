@@ -56,6 +56,7 @@ fn updated(app: &AppWindow, mut p: Preferences) -> anyhow::Result<Preferences> {
     p.auto_reconnect = app.get_auto_reconnect();
     p.reduced_motion = app.get_reduced();
     p.country_lookup = app.get_lookup();
+    p.tray_enabled = app.get_tray_enabled();
     vmate_engine::validate_preferences(&p)?;
     Ok(p)
 }
@@ -85,6 +86,7 @@ pub(super) fn apply(app: &AppWindow, p: &Preferences) {
     app.set_retry_limit(p.retry_limit.to_string().into());
     app.set_reduced(p.reduced_motion);
     app.set_lookup(p.country_lookup);
+    app.set_tray_enabled(p.tray_enabled);
 }
 
 fn edit(app: &AppWindow, preset: &ScanPreset) {

@@ -12,7 +12,7 @@ name: ci
 
 on:
   push:
-    branches: [main, fix/linux-session-lifecycle, fix/scan-upgrade-compatibility, feat/slint-desktop]
+    branches: [main, fix/linux-session-lifecycle, fix/scan-upgrade-compatibility, feat/slint-desktop, fix/desktop-input-tray]
   pull_request:
 
 permissions:

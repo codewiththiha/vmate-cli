@@ -3,6 +3,9 @@ import { Theme, Action, Rule } from "tokens.slint";
 
 export component Settings inherits Rectangle {
     in property <bool> busy;
+    in property <bool> mac;
+    in property <bool> tray-active;
+    in-out property <bool> tray-enabled;
     in property <bool> review-scroll;
     in property <[string]> names;
     in-out property <int> editing;
@@ -42,6 +45,8 @@ export component Settings inherits Rectangle {
                 Text { text: "Rescan loop limit · 1–20"; color: Theme.ink; vertical-alignment: center; }
                 LineEdit { text <=> root.retry-limit; input-type: number; max-width: 90px; }
             }
+            if !root.mac: CheckBox { text: "Show system tray icon · close window to tray"; checked <=> root.tray-enabled; }
+            if !root.mac: Text { text: root.tray-active ? "Tray ready. Use its menu to reopen or quit vmate." : "Requires a desktop StatusNotifier/AppIndicator host. Without one, closing exits."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }
             CheckBox { text: "Reduce motion"; checked <=> root.reduced; }
             CheckBox { text: "Look up relay countries with ipinfo.io"; checked <=> root.lookup; }
             Text { text: "Country lookup sends relay IPs to ipinfo.io."; color: Theme.muted; font-size: 12px; wrap: word-wrap; }

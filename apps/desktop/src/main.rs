@@ -3,6 +3,8 @@
 mod binding;
 mod capture;
 mod fixtures;
+#[cfg(target_os = "linux")]
+mod tray;
 slint::include_modules!();
 
 fn main() -> anyhow::Result<()> {
@@ -34,7 +36,8 @@ fn main() -> anyhow::Result<()> {
     let engine = vmate_engine::Engine::start(vmate_engine::Configuration::system()?)?;
     let app = AppWindow::new()?;
     let _timer = binding::bind(&app, engine.port());
-    app.run()?;
+    app.show()?;
+    slint::run_event_loop_until_quit()?;
     drop(engine);
     Ok(())
 }

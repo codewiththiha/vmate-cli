@@ -140,3 +140,28 @@ sessions. No evidence justifies increasing the universal default to 500.
 - macOS workspace run 45125829214 exposed a test click offset from hiding Linux
   chrome; the revised test exercises both content layouts locally.
 - NetworkManager authorization/automatic tunnel egress remain unvalidated.
+
+## Native frame and optional Linux tray correction
+
+Local branch fix/desktop-input-tray removes the client MenuBar, custom Linux
+chrome and drag callback. The window manager owns a single native title bar;
+content contains no window-drag region. Normal taskbar identity is unchanged.
+
+- Linux tray preference defaults to false and old JSON preferences still load.
+- One bounded worker channel owns optional StatusNotifier registration off the
+  GUI thread. Shutdown unregisters and awaits service completion.
+- Closing hides only while a host is available; explicit Quit cancels owned work.
+  Host loss restores the window, and an unavailable host cannot trap a hidden app.
+- Real Xvfb/Openbox tests passed body-drag rejection, pointer navigation, text
+  entry and persisted Save, native minimize/maximize and normal close/exit.
+- Real app/D-Bus fixture tests passed default-off, close/reopen, hidden Quit,
+  disable/unregister, host-loss restoration and unavailable-host close/exit.
+- 172 workspace Rust tests and 12 Python package tests passed locally. Strict
+  workspace clippy/all-targets/all-features, formatting and source guards passed.
+- Notice/source generation retained 483 Cargo.lock-verified Linux dependencies,
+  including the new Unlicense-licensed ksni tray implementation.
+- Reviewed 96 component captures and an actual native-window Home capture. There
+  is one system title bar, no extra menu strip, and compact bottom navigation
+  fits at 480px. The fixture banner exists only in deterministic capture mode.
+- GNOME/KDE tray rendering, Wayland and updated macOS interaction are not locally
+  validated. The published desktop-v1.2.4-alpha.1 assets are not changed here.
