@@ -7,23 +7,26 @@ Its research sources and constraints were read before implementing the UI.
 
 ## Capture loop
 
-Iteration 1 covered the six pages and empty, busy, connected, dependency and
-permission-failure states at desktop and compact sizes. Review found oversized
-secondary actions, cramped copy buttons, oversized numeric fields and a log
-centered in a large empty viewport. Iteration 2 corrected those and added hostname
-and country filtering. It exposed a details-panel overflow at the shorter height.
+Earlier passes were insufficient: a narrow relay detail pane clipped long names,
+copy-heavy headings competed with actions, and only two similar widths were used.
+The Home revision replaces the initial dashboard with one primary action.
 
-The final pass constrains button widths, pins details actions below an independently
-scrollable body and adds explicit lower-content captures for setup and details.
-Navigation and relay selection have keyboard focus; buttons have focus and disabled
-states. The log starts at the top-left. Setup copy actions retain readable padding.
-There are 30 PNGs: 15 scenarios at 1160×770 and 860×740. A self-contained HTML
-gallery is generated for visual review. CI uploads captures, gallery and native
-smoke output; a missing state or suspiciously small capture fails the matrix check.
+Home pass 1 exposed a blank power control caused by missing Unicode glyph coverage.
+Pass 2 bundled an SVG, removed repeated status/footer prose, anchored settings Save,
+and replaced the detail split with a single list. Pass 3 added 480×600 coverage;
+an error banner pushed bottom navigation below the window, and setup commands
+wrapped beside Copy into a too-narrow column. The final pass shrinks the narrow
+Home control, reserves navigation, and stacks setup Copy below its command.
+
+Final captures: review/home-final, 24 scenarios at 480×600, 860×740, 1160×770 and
+1440×900 (96 images). Home covers idle, scanning, connecting, connected, retrying,
+stopping, exhaustion and authorization error. Settings has top and bottom captures.
+The self-contained review/gallery.html embeds all four sizes. These are fixture
+captures, not evidence of a connected public VPN or native Mac chrome.
 
 ## Behavior checks
 
-162 Rust tests passed locally, including actual Slint pointer activation/navigation,
+170 Rust tests passed locally, including actual Slint pointer activation/navigation,
 engine-only 277-config fake scans/export, immediate cancellation before dispatch,
 running-scan shutdown/join and bounded logs/validation. Existing CLI regressions
 remain in apps/cli/tests. No public VPN connection was requested for this GUI work.
@@ -51,5 +54,14 @@ obligations still require redistribution review.
 Do not call these review artifacts a finished public release or universal VPN proof.
 
 A cross-context regression also checks the relay library while a VPN is connected:
-its scan action is disabled, not mislabeled as Stop scan. Disconnect remains in
-Connections. A UI pointer test guards against starting a scan in that state.
+its scan action is disabled, not mislabeled as Stop scan. Disconnect is available on Home and in Connections. A UI pointer test guards against starting a scan in that state.
+
+## Automatic-flow verification boundary
+
+Seven deterministic scheduler tests cover recent ordering, empty-history scanning,
+bounded rescans, disconnect preservation, reconnect-to-next behavior, cancelled
+scan suppression, and fatal service errors. Preset validation covers assignments,
+duplicate names, resource bounds, loop bounds and serialization. Real-component
+pointer tests exercise Home Connect/Cancel/Disconnect and disable restart during
+teardown. These do not validate live NetworkManager authorization or tunnel egress.
+The new automatic path has not been exercised against a real system VPN service.

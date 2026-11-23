@@ -61,3 +61,10 @@ feature test modules until there are two real cross-feature callers.
 - `packaging/package.py`: system/bundled staging for both app frontends.
 - `tools/review_screenshots.py`: verifies the capture matrix and embeds images
   in a self-contained gallery. Manual critique remains required.
+
+- `crates/vmate-engine/src/automatic.rs`: recent-first retry coordinator; its
+  backend contract is exercised by both the service adapter and scheduler tests.
+- `platform.rs::recent`: bounded newest-first database query shared by refresh
+  and automatic connection, rather than trusting a potentially stale UI model.
+- `scan.rs::with_preset`: shared manual/automatic scan execution; action selection
+  belongs to the engine, never the Slint callback layer.

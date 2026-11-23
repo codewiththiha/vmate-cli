@@ -66,3 +66,17 @@ Local setup errors have a distinct monitor outcome. They abort raw connection
 attempts without consuming relay retry budgets. Probe tester errors cancel the
 scan, join workers and return an error rather than recording remote failures.
 Teardown is checked before a successful probe or another tunnel is allowed.
+
+## Desktop automatic connection
+
+Home submits AutoConnect to the existing bounded actor. The actor loads successful
+history newest-first, activates one temporary NetworkManager profile, and awaits
+its owned session. Failed/ended candidates leave successful history, not disk.
+After exhaustion, the assigned Connect preset drives a scan, then activation.
+The retry limit bounds rescan batches; auto-reconnect controls recovery after an
+established connection drops. Cancellation is shared across scan, session and
+backoff, and teardown must be confirmed before the next candidate.
+
+Named presets are persisted in desktop.json, with independent Scan and Connect
+assignments. Runtime workers and process handling remain outside the GUI thread.
+The retry adapter is Linux-only; macOS retains explicit Tunnelblick handoff.

@@ -1,5 +1,6 @@
 //! Toolkit-independent application engine with one owned asynchronous worker.
 
+mod automatic;
 mod host;
 pub mod model;
 mod operations;
@@ -158,8 +159,22 @@ impl Drop for Engine {
 
 /// Check resource limits before starting any worker.
 pub fn validate_preferences(p: &model::Preferences) -> Result<()> {
-    if !(1..=500).contains(&p.workers) || !(1..=120).contains(&p.timeout) {
-        bail!("Use 1–500 workers and a 1–120 second timeout.");
+    if !(1..=20).contains(&p.retry_limit) || p.presets.is_empty() || p.presets.len() > 16 {
+        bail!("Use 1–20 retry loops and 1–16 presets.");
+    }
+    let mut names = std::collections::HashSet::new();
+    for preset in &p.presets {
+        if preset.name.trim().is_empty()
+            || preset.name.len() > 48
+            || !names.insert(&preset.name)
+            || !(1..=500).contains(&preset.workers)
+            || !(1..=120).contains(&preset.timeout)
+        {
+            bail!("Preset names must be unique; use 1–500 workers and 1–120 seconds.");
+        }
+    }
+    if !names.contains(&p.scan_preset) || !names.contains(&p.connect_preset) {
+        bail!("Assign an existing preset to Scan and Connect.");
     }
     Ok(())
 }

@@ -1,17 +1,25 @@
 {
-  "rust_tests": 162,
-  "headless_scenarios": 15,
+  "rust_tests": 170,
+  "headless_scenarios": 24,
   "sizes": [
+    [
+      480,
+      600
+    ],
+    [
+      860,
+      740
+    ],
     [
       1160,
       770
     ],
     [
-      860,
-      740
+      1440,
+      900
     ]
   ],
-  "headless_images": 30,
+  "headless_images": 96,
   "native_linux": {
     "window_class": "vmate",
     "taskbar_identity": "passed",
@@ -39,7 +47,9 @@
     "Wayland compositor",
     "live NetworkManager authorization",
     "macOS Tunnelblick authorization",
-    "internet egress"
+    "internet egress",
+    "automatic connection adapter against live NetworkManager"
   ],
-  "public_release": false
+  "public_release": false,
+  "capture_directory": "review/home-final"
 }

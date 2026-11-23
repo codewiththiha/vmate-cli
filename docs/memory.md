@@ -104,3 +104,13 @@ sessions. No evidence justifies increasing the universal default to 500.
 - No measured startup/latency claim; polling is 100ms, not a latency benchmark.
 - No native macOS/Wayland/polkit/egress or signed release validation locally.
 - GitHub desktop matrix started; results must be inspected before acceptance.
+
+
+### One-button Home revision
+
+- Local suite: 170 tests; automatic coordinator uses a fake service backend in tests.
+- Four capture passes culminated in 96 fixture PNGs at four sizes, minimum 480×600.
+- Power glyph and banner-induced navigation overflow were found and corrected.
+- Named presets independently configure manual Scan and automatic Connect.
+- Rescan loops are limited to 1–20; retry pauses cap at 30 seconds.
+- No new live VPN/egress or macOS automatic activation validation is claimed.

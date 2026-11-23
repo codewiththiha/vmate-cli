@@ -21,9 +21,13 @@ pub struct Profile {
 
 /// Persistent desktop preferences, separate from CLI defaults.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Preferences {
-    pub workers: usize,
-    pub timeout: u64,
+    pub presets: Vec<ScanPreset>,
+    pub scan_preset: String,
+    pub connect_preset: String,
+    pub auto_reconnect: bool,
+    pub retry_limit: u32,
     pub reduced_motion: bool,
     pub country_lookup: bool,
 }
@@ -31,8 +35,11 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            workers: 64,
-            timeout: 5,
+            presets: vec![ScanPreset::default()],
+            scan_preset: "Default".into(),
+            connect_preset: "Default".into(),
+            auto_reconnect: false,
+            retry_limit: 3,
             reduced_motion: false,
             country_lookup: false,
         }
@@ -80,10 +87,29 @@ impl Default for Snapshot {
 /// Explicit, validated user intent accepted by the application engine.
 #[derive(Clone, Debug)]
 pub enum Command {
+    AutoConnect,
     Refresh,
     Scan,
     Connect(String),
     Export { path: PathBuf, destination: PathBuf },
     Import { path: PathBuf },
     Save(Preferences),
+}
+
+/// A named, persisted scan configuration assigned independently to actions.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ScanPreset {
+    pub name: String,
+    pub workers: usize,
+    pub timeout: u64,
+}
+
+impl Default for ScanPreset {
+    fn default() -> Self {
+        Self {
+            name: "Default".into(),
+            workers: 64,
+            timeout: 5,
+        }
+    }
 }

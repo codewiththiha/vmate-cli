@@ -23,7 +23,12 @@ pub(super) fn run(directory: &str) -> anyhow::Result<()> {
     app.set_fixture(true);
     app.set_reduced(true);
     app.show()?;
-    for (width, height, suffix) in [(1160, 770, "desktop"), (860, 740, "compact")] {
+    for (width, height, suffix) in [
+        (480, 600, "minimum"),
+        (860, 740, "compact"),
+        (1160, 770, "desktop"),
+        (1440, 900, "wide"),
+    ] {
         app.window().set_size(PhysicalSize::new(width, height));
         for scenario in fixtures::SCENARIOS {
             fixtures::apply(&app, scenario);
@@ -81,12 +86,12 @@ mod tests {
                 button: PointerEventButton::Left,
             });
         };
-        click(1050.0, 168.0);
+        click(1080.0, 165.0);
         assert!(
             clicked.get(),
             "primary scan control must accept pointer activation"
         );
-        click(80.0, 280.0);
+        click(80.0, 323.0);
         assert_eq!(app.get_page(), 1, "sidebar must navigate to Connections");
         fixtures::apply(&app, "connected-library");
         clicked.set(false);
@@ -94,11 +99,45 @@ mod tests {
         window.draw_if_needed(|renderer| {
             renderer.render(&mut pixels, 1160);
         });
-        click(1050.0, 168.0);
+        click(1080.0, 165.0);
         assert!(
             !clicked.get(),
             "library scan must stay disabled during a VPN connection"
         );
+        home_controls(&app, &window, &mut pixels, &click);
         app.hide().unwrap();
+    }
+
+    fn home_controls(
+        app: &AppWindow,
+        window: &MinimalSoftwareWindow,
+        pixels: &mut [slint::Rgb8Pixel],
+        click: &dyn Fn(f32, f32),
+    ) {
+        let connects = Rc::new(std::cell::Cell::new(0));
+        let cancels = Rc::new(std::cell::Cell::new(0));
+        let flag = connects.clone();
+        app.on_auto_connect(move || flag.set(flag.get() + 1));
+        let flag = cancels.clone();
+        app.on_cancel(move || flag.set(flag.get() + 1));
+        for scenario in [
+            "home-idle",
+            "home-scanning",
+            "home-connected",
+            "home-stopping",
+        ] {
+            fixtures::apply(app, scenario);
+            app.window().request_redraw();
+            window.draw_if_needed(|renderer| {
+                renderer.render(pixels, 1160);
+            });
+            click(660.0, 400.0);
+        }
+        assert_eq!(connects.get(), 1, "idle Home starts one automatic workflow");
+        assert_eq!(
+            cancels.get(),
+            2,
+            "busy and connected Home cancel, stopping cannot restart"
+        );
     }
 }

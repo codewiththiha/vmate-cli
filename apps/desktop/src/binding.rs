@@ -4,6 +4,7 @@ use crate::{AppWindow, ProfileRow, RelayRow};
 use slint::{ComponentHandle, ModelRc, VecModel};
 use std::time::Duration;
 mod actions;
+mod settings;
 
 use vmate_engine::{Port, model::Snapshot};
 
@@ -32,32 +33,19 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
     let timer = slint::Timer::default();
     let mut previous = String::new();
     let mut preferences = String::new();
-    let mut first_ready = true;
     timer.start(
         slint::TimerMode::Repeated,
         Duration::from_millis(100),
         move || {
             let Some(app) = weak.upgrade() else { return };
             let snapshot = port.snapshot();
-            if first_ready && !snapshot.events.is_empty() {
-                if snapshot.openvpn.contains("unavailable")
-                    || snapshot.system_service.contains("unavailable")
-                    || (snapshot.relays.is_empty() && snapshot.profiles.is_empty())
-                {
-                    app.set_page(2);
-                }
-                first_ready = false;
-            }
             if (closing.get() || port.is_shutting_down()) && !snapshot.busy {
                 let _ = app.hide();
                 return;
             }
             let preference_key = format!("{:?}", snapshot.preferences);
             if preference_key != preferences {
-                app.set_workers(snapshot.preferences.workers.to_string().into());
-                app.set_timeout(snapshot.preferences.timeout.to_string().into());
-                app.set_reduced(snapshot.preferences.reduced_motion);
-                app.set_lookup(snapshot.preferences.country_lookup);
+                settings::apply(&app, &snapshot.preferences);
                 preferences = preference_key;
             }
             let signature = format!("{:?}", snapshot);

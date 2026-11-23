@@ -11,6 +11,17 @@ use vmate_core::{builtin, country::CountryCode, db::ConfigRepo, filter::CountryF
 
 pub(super) async fn run(port: &Port) -> Result<()> {
     let preferences = port.snapshot().preferences;
+    let preset = preferences
+        .presets
+        .iter()
+        .find(|p| p.name == preferences.scan_preset)
+        .cloned()
+        .ok_or_else(|| anyhow::anyhow!("Scan preset is missing"))?;
+    with_preset(port, &preset).await
+}
+
+pub(super) async fn with_preset(port: &Port, preset: &crate::model::ScanPreset) -> Result<()> {
+    let preferences = port.snapshot().preferences;
     crate::validate_preferences(&preferences)?;
     let dir = port.configuration.config_dir.join("builtin/vpn-gate/udp");
     for config in builtin::enumerate(builtin::Provider::VpnGate, builtin::Proto::Udp) {
@@ -37,8 +48,8 @@ pub(super) async fn run(port: &Port) -> Result<()> {
     let options = ScanOptions {
         dir,
         limit: usize::MAX,
-        timeout: Duration::from_secs(preferences.timeout),
-        workers: preferences.workers,
+        timeout: Duration::from_secs(preset.timeout),
+        workers: preset.workers,
         modify: false,
         backup: false,
         no_save: false,

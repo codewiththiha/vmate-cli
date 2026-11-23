@@ -19,10 +19,7 @@ pub(super) async fn refresh(port: &Port) -> Result<()> {
     let binary = &port.configuration.openvpn;
     let version = output(binary.to_string_lossy().as_ref(), &["--version"]).await;
     let profiles = profiles().await;
-    let repo = ConfigRepo::new(vmate_core::db::init_pool(&port.configuration.database).await?);
-    let relays = repo
-        .list_recent(&CountryFilter::new(), Some(500), 0)
-        .await?;
+    let relays = recent(port).await?;
     let mut state = port.state.lock().unwrap();
     state.snapshot.preferences = preferences;
     state.snapshot.openvpn = match version {
@@ -37,18 +34,7 @@ pub(super) async fn refresh(port: &Port) -> Result<()> {
         Err(e) => format!("NetworkManager unavailable: {e:#}"),
     };
     state.snapshot.profiles = profiles.unwrap_or_default();
-    state.snapshot.relays = relays
-        .into_iter()
-        .map(|row| Relay {
-            path: row.path.into(),
-            name: row.remote_host.unwrap_or_else(|| "Saved config".into()),
-            country: row.country,
-            checked: row
-                .last_success_at
-                .map(|v| v.format("%Y-%m-%d %H:%M UTC").to_string())
-                .unwrap_or_default(),
-        })
-        .collect();
+    state.snapshot.relays = relays;
     state.event("Dependencies and saved handshake history refreshed.".into());
     Ok(())
 }
@@ -85,7 +71,7 @@ async fn profiles() -> Result<Vec<Profile>> {
         .collect())
 }
 
-async fn output(binary: &str, arguments: &[&str]) -> Result<String> {
+pub(super) async fn output(binary: &str, arguments: &[&str]) -> Result<String> {
     let mut command = tokio::process::Command::new(binary);
     command
         .args(arguments)
@@ -157,4 +143,23 @@ pub(super) fn save(port: &Port, preferences: Preferences) -> Result<()> {
     state.snapshot.preferences = preferences;
     state.snapshot.message = "Preferences saved. Applied to your next scan.".into();
     Ok(())
+}
+
+pub(super) async fn recent(port: &Port) -> Result<Vec<Relay>> {
+    let repo = ConfigRepo::new(vmate_core::db::init_pool(&port.configuration.database).await?);
+    let relays = repo
+        .list_recent(&CountryFilter::new(), Some(500), 0)
+        .await?;
+    Ok(relays
+        .into_iter()
+        .map(|row| Relay {
+            path: row.path.into(),
+            name: row.remote_host.unwrap_or_else(|| "Saved config".into()),
+            country: row.country,
+            checked: row
+                .last_success_at
+                .map(|v| v.format("%Y-%m-%d %H:%M UTC").to_string())
+                .unwrap_or_default(),
+        })
+        .collect())
 }

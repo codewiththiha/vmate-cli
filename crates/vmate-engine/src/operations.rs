@@ -21,8 +21,10 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
             state.snapshot.error.clear();
         }
         let managed = matches!(&command, Command::Connect(_));
+        let automatic = matches!(&command, Command::AutoConnect);
         let result = execute(&port, command).await;
-        let uncertain = managed && result.is_err();
+        let uncertain = result.is_err()
+            && (managed || (automatic && port.snapshot().status == "Check system VPN"));
         if let Err(error) = result {
             fail(&port, error);
         }
@@ -44,6 +46,7 @@ pub(super) async fn run(port: Port, mut receiver: mpsc::Receiver<Command>) {
 
 async fn execute(port: &Port, command: Command) -> Result<()> {
     match command {
+        Command::AutoConnect => crate::automatic::run(port).await,
         Command::Refresh => platform::refresh(port).await,
         Command::Scan => scan::run(port).await,
         Command::Connect(uuid) => {

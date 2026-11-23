@@ -4,6 +4,15 @@ use crate::{AppWindow, binding};
 use vmate_engine::model::{Profile, Relay, Snapshot};
 
 pub(super) const SCENARIOS: &[&str] = &[
+    "preferences-bottom",
+    "home-idle",
+    "home-scanning",
+    "home-connecting",
+    "home-connected",
+    "home-retrying",
+    "home-stopping",
+    "home-exhausted",
+    "home-permission",
     "connected-library",
     "about",
     "library",
@@ -82,6 +91,14 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
     app.set_install_command(
         "sudo apt install network-manager-openvpn network-manager-openvpn-gnome openvpn".into(),
     );
+    app.set_preset_names(slint::ModelRc::new(slint::VecModel::from(vec![
+        "Default".into(),
+    ])));
+    app.set_preset_name("Default".into());
+    app.set_retry_limit("3".into());
+    if scenario.starts_with("home-") {
+        home(app, scenario, &mut snapshot);
+    }
     select_scenario(app, scenario, &mut snapshot);
     binding::apply(app, &snapshot);
 }
@@ -137,6 +154,48 @@ fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
         }
         "activity" => app.set_page(3),
         "preferences" => app.set_page(4),
+        "preferences-bottom" => {
+            app.set_page(4);
+            app.set_review_scroll(true);
+        }
+        _ => {}
+    }
+}
+
+fn home(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
+    app.set_page(6);
+    match scenario {
+        "home-scanning" => {
+            snapshot.busy = true;
+            snapshot.status = "Scanning".into();
+            snapshot.completed = 148;
+            snapshot.total = 277;
+        }
+        "home-connecting" => {
+            snapshot.busy = true;
+            snapshot.status = "Connecting".into();
+        }
+        "home-connected" => {
+            snapshot.busy = true;
+            snapshot.connected = true;
+            snapshot.status = "Connected".into();
+        }
+        "home-retrying" => {
+            snapshot.busy = true;
+            snapshot.status = "Retrying".into();
+        }
+        "home-stopping" => {
+            snapshot.busy = true;
+            snapshot.message = "Disconnecting and reaping owned processes…".into();
+        }
+        "home-exhausted" => {
+            snapshot.error = "Retry limit reached. Connect to try again.".into();
+        }
+        "home-permission" => {
+            snapshot.error =
+                "NetworkManager: Not authorized. Start your desktop polkit agent, then try again."
+                    .into();
+        }
         _ => {}
     }
 }

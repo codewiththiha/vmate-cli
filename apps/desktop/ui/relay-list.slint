@@ -16,33 +16,18 @@ export component RelayList inherits Rectangle {
     callback import-relay;
     callback export-relay;
     background: Theme.paper;
-    VerticalBox { x: 0px; y: 0px; width: parent.width; height: parent.height; padding: 28px; spacing: 20px;
+    VerticalBox { padding: 16px; spacing: 12px;
         HorizontalBox { spacing: 12px;
-            VerticalBox { spacing: 5px;
-                Text { text: "Find your next connection"; color: Theme.ink; font-size: 27px; font-weight: 600; }
-                Text { text: "Test relays without changing your system network."; color: Theme.muted; font-size: 14px; }
-            }
-            Action { label: root.busy ? "Stop scan" : "Scan relays"; primary: true; enabled: !root.operation-blocked || root.busy;
+            Text { text: "Relays"; color: Theme.ink; font-size: 24px; font-weight: 600; }
+            Action { label: root.busy ? "Stop scan" : "Scan"; primary: true;
+                enabled: !root.operation-blocked || root.busy;
                 clicked => { if root.busy { root.cancel(); } else { root.scan(); } }
             }
         }
-        Rectangle { height: 42px; background: Theme.tint; border-radius: 4px;
-            HorizontalBox { padding: 12px;
-                Text { text: root.busy ? "Checking " + root.completed + " of " + root.total + " configurations" : "VPN Gate · UDP · " + root.rows.length + " saved handshakes"; color: Theme.pine; font-size: 13px; }
-                Text { text: "A handshake is not a VPN connection"; color: Theme.muted; font-size: 12px; horizontal-alignment: right; }
-            }
-        }
-        LineEdit { text <=> root.query; placeholder-text: "Filter by hostname or country"; height: 36px; }
-        HorizontalBox { spacing: 22px;
-            VerticalBox { spacing: 0px;
-                HorizontalBox { height: 30px; Text { text: "RELAY"; font-size: 11px; color: Theme.muted; } Text { text: "REGION"; font-size: 11px; color: Theme.muted; horizontal-alignment: right; } }
-                Rule {}
-                if root.rows.length == 0: VerticalBox { alignment: center; spacing: 12px;
-                    Text { text: root.query == "" ? "Your relay library starts here" : "No relays match this filter"; font-size: 21px; color: Theme.ink; font-weight: 600; }
-                    Text { text: root.query == "" ? "Run a scan to check the built-in relays. Successful\nhandshakes are saved locally for next time." : "Try a different hostname or country code,\nor clear the filter to see all saved relays."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
-                    Rectangle { vertical-stretch: 1; }
-                }
-                if root.rows.length > 0: ScrollView {
+        Text { text: root.busy ? "Checking relays · " + root.completed + " / " + root.total : root.rows.length + " saved relays"; color: Theme.muted; font-size: 13px; }
+        LineEdit { text <=> root.query; placeholder-text: "Search relays"; height: 36px; }
+        if root.rows.length == 0: Text { text: root.query == "" ? "No saved relays. Connect from Home to find one." : "No matching relays"; color: Theme.muted; wrap: word-wrap; vertical-stretch: 1; }
+                if root.rows.length > 0: ScrollView { content-width: self.width - 12px;
                     VerticalBox { spacing: 0px; padding: 0px;
                         for row[index] in root.rows: Rectangle { height: 73px; background: root.selected == index ? Theme.tint : hit.has-hover ? #f0f2ec : Theme.paper;
                             HorizontalBox { padding-left: 12px; padding-right: 12px; spacing: 12px;
@@ -62,26 +47,14 @@ export component RelayList inherits Rectangle {
                         }
                     }
                 }
-            }
-            if root.width > 850px: Rectangle { width: 260px; border-width: 1px; border-color: Theme.rule; background: Theme.surface; border-radius: 6px;
-                VerticalBox { padding: 18px; spacing: 12px;
-                    ScrollView { content-width: self.width - 12px; content-y: root.review-scroll ? min(0px, self.height - self.content-height) : 0px; VerticalBox { padding: 0px; spacing: 12px; alignment: start;
-                    SectionTitle { text: "RELAY DETAILS"; }
-                    Text { text: root.selected >= 0 ? root.rows[root.selected].name : "Choose a relay"; font-size: 19px; font-weight: 600; color: Theme.ink; wrap: char-wrap; }
-                    Text { text: root.selected >= 0 ? "Handshake passed. Import this config into your system VPN service to connect." : "Select a saved handshake to inspect, export or import its OpenVPN configuration."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
-                    Rule {}
-                    SectionTitle { text: "LOCAL CONFIGURATION"; }
-                    Text { text: root.selected >= 0 ? root.rows[root.selected].path : "No relay selected"; color: Theme.muted; font-size: 12px; wrap: char-wrap; }
-                    Rectangle { vertical-stretch: 1; }
-                    } }
-                    Action { label: "Import into system VPN"; primary: true; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
-                    Action { label: "Export configuration…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
-                }
-            }
-        }
-        if root.width <= 850px: HorizontalBox { spacing: 12px;
-            Action { label: "Import selected relay"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
-            Action { label: "Export configuration…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
+
+        Rule {}
+        if root.width >= 600px: Text { text: root.selected >= 0 ? root.rows[root.selected].path : "Select a relay";
+            color: Theme.muted; font-size: 12px; overflow: elide; }
+        HorizontalBox { spacing: 12px;
+            Action { label: "Import"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
+            Action { label: "Export…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
+            Rectangle { horizontal-stretch: 1; }
         }
     }
 }

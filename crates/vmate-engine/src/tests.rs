@@ -6,10 +6,10 @@ use super::*;
 fn preference_limits_reject_unbounded_work() {
     let mut preferences = model::Preferences::default();
     assert!(validate_preferences(&preferences).is_ok());
-    preferences.workers = 501;
+    preferences.presets[0].workers = 501;
     assert!(validate_preferences(&preferences).is_err());
-    preferences.workers = 500;
-    preferences.timeout = 0;
+    preferences.presets[0].workers = 500;
+    preferences.presets[0].timeout = 0;
     assert!(validate_preferences(&preferences).is_err());
 }
 
@@ -48,4 +48,29 @@ fn cancellation_bypasses_a_full_command_queue() {
     assert!(port.send(Command::Refresh).is_err());
     port.cancel();
     assert!(port.state.lock().unwrap().operation.is_cancelled());
+}
+
+#[test]
+fn presets_require_unique_names_valid_assignments_and_bounded_loops() {
+    let mut preferences = model::Preferences {
+        retry_limit: 0,
+        ..model::Preferences::default()
+    };
+    assert!(validate_preferences(&preferences).is_err());
+    preferences.retry_limit = 21;
+    assert!(validate_preferences(&preferences).is_err());
+    preferences.retry_limit = 2;
+    preferences.connect_preset = "Missing".into();
+    assert!(validate_preferences(&preferences).is_err());
+    preferences.connect_preset = "Default".into();
+    preferences.presets.push(model::ScanPreset::default());
+    assert!(validate_preferences(&preferences).is_err());
+    preferences.presets[1].name = "Quick".into();
+    preferences.scan_preset = "Quick".into();
+    assert!(validate_preferences(&preferences).is_ok());
+    let json = serde_json::to_vec(&preferences).unwrap();
+    let loaded: model::Preferences = serde_json::from_slice(&json).unwrap();
+    assert_eq!(loaded.scan_preset, "Quick");
+    assert_eq!(loaded.connect_preset, "Default");
+    assert_eq!(loaded.retry_limit, 2);
 }

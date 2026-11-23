@@ -2,15 +2,15 @@
 
 use crate::AppWindow;
 use slint::{ComponentHandle, Model};
-use vmate_engine::{
-    Port,
-    model::{Command, Preferences},
-};
+use vmate_engine::{Port, model::Command};
 
 pub(super) fn bind(app: &AppWindow, port: &Port) {
     let p = port.clone();
     let weak = app.as_weak();
     app.on_scan(move || send(&p, &weak, Command::Scan));
+    let p = port.clone();
+    let weak = app.as_weak();
+    app.on_auto_connect(move || send(&p, &weak, Command::AutoConnect));
     let p = port.clone();
     app.on_cancel(move || p.cancel());
     let p = port.clone();
@@ -76,29 +76,7 @@ fn relay_actions(app: &AppWindow, port: &Port) {
 }
 
 fn preferences(app: &AppWindow, port: &Port) {
-    let p = port.clone();
-    let weak = app.as_weak();
-    app.on_save(move || {
-        let Some(app) = weak.upgrade() else { return };
-        let parsed = app
-            .get_workers()
-            .parse::<usize>()
-            .ok()
-            .zip(app.get_timeout().parse::<u64>().ok());
-        match parsed {
-            Some((workers, timeout)) => send(
-                &p,
-                &weak,
-                Command::Save(Preferences {
-                    workers,
-                    timeout,
-                    reduced_motion: app.get_reduced(),
-                    country_lookup: app.get_lookup(),
-                }),
-            ),
-            None => app.set_diagnostic("Enter whole numbers for workers and timeout.".into()),
-        }
-    });
+    super::settings::bind(app, port);
     let weak = app.as_weak();
     app.on_copy_command(move || {
         if let Some(app) = weak.upgrade() {

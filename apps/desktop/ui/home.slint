@@ -1,0 +1,51 @@
+import { VerticalBox, HorizontalBox } from "std-widgets.slint";
+import { Theme } from "tokens.slint";
+
+export component Home inherits Rectangle {
+    in property <bool> busy;
+    in property <bool> compact;
+    in property <bool> connected;
+    in property <string> status;
+    in property <int> completed;
+    in property <int> total;
+    in property <bool> stopping;
+    callback connect;
+    callback cancel;
+    background: Theme.paper;
+    VerticalBox { padding: root.compact ? 12px : 20px; spacing: root.compact ? 10px : 16px;
+        Rectangle { vertical-stretch: 1; }
+        Text { text: root.stopping ? "Disconnecting" : root.connected ? "Connected" : root.status;
+            color: Theme.ink; font-size: 25px; font-weight: 600; horizontal-alignment: center; }
+        HorizontalBox { Rectangle { horizontal-stretch: 1; }
+            power := Rectangle { width: root.compact ? 120px : 156px; height: self.width; border-radius: self.width / 2;
+                background: root.stopping ? #59665f : touch.has-hover ? #173f35 : Theme.pine;
+                border-width: focus.has-focus ? 4px : 0px; border-color: #83aa9b;
+                animate background { duration: Theme.reduced-motion ? 0ms : 140ms; }
+                Image { x: (parent.width - self.width) / 2; y: (parent.height - self.height) / 2; width: root.compact ? 48px : 58px; height: self.width; source: @image-url("../assets/power.svg"); }
+                focus := FocusScope { enabled: !root.stopping;
+                    key-pressed(e) => { if e.text == " " || e.text == "\n" { root.busy ? root.cancel() : root.connect(); return accept; } return reject; }
+                }
+                touch := TouchArea { enabled: !root.stopping; mouse-cursor: pointer;
+                    clicked => { focus.focus(); root.busy ? root.cancel() : root.connect(); }
+                }
+                accessible-role: button;
+                accessible-label: root.busy ? (root.connected ? "Disconnect" : "Cancel") : "Connect";
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        Text { text: root.stopping ? "Please wait" : root.busy ? (root.connected ? "Disconnect" : "Cancel") : "Connect";
+            horizontal-alignment: center; color: Theme.ink; font-size: 15px; }
+        HorizontalBox { Rectangle { horizontal-stretch: 1; }
+            if root.busy && !root.connected: Rectangle { width: 180px; height: 3px; background: root.busy && !root.connected ? Theme.rule : transparent; clip: true;
+                Rectangle { width: root.total > 0 && root.status == "Scanning" ? parent.width * root.completed / max(1, root.total) : 52px;
+                    height: 3px; background: root.busy && !root.connected ? Theme.pine : transparent;
+                    x: (root.total > 0 && root.status == "Scanning") || Theme.reduced-motion ? 0px : mod(animation-tick() / 8ms, 232) * 1px - 52px;
+                }
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+        Text { text: root.busy && root.status == "Scanning" ? "Checking relays · " + root.completed + " / " + root.total : "";
+            font-size: 12px; color: Theme.muted; horizontal-alignment: center; }
+        Rectangle { vertical-stretch: 1; }
+    }
+}

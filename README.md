@@ -18,6 +18,12 @@ from a keyboard-driven terminal UI backed by SQLite.
 - `crates/vmate-engine`: toolkit-independent application commands and snapshots.
 - `crates/vmate-core`: shared VPN, storage and OS services.
 
+Home offers one Connect action: recent relays first, then automatic scanning and
+activation on Linux NetworkManager. Settings stores named scan presets, separate
+Scan/Connect assignments, auto-reconnect and a bounded rescan-loop limit.
+macOS still uses explicit Tunnelblick handoff; automatic Home activation is not
+implemented there yet.
+
 Run `cargo run -p vmate-desktop`. Headless review:
 `cargo run -p vmate-desktop -- --capture-dir review/screenshots`.
 See [installation and permission boundaries](docs/desktop-installation.md),
