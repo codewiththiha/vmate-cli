@@ -9,7 +9,7 @@ on:
       release_tag:
         description: Desktop-only prerelease tag (must not start with v)
         type: string
-        default: desktop-v1.2.4-alpha.1
+        default: desktop-v1.2.4-alpha.2
   push:
     branches: [main, feat/slint-desktop, fix/desktop-input-tray]
   pull_request:

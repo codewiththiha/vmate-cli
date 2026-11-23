@@ -4,6 +4,21 @@ Native Rust + Slint desktop preview, with the CLI included. Not a stable VPN
 release. Public VPN Gate relays are untrusted third parties; no privacy, DNS-leak,
 kill-switch, or uninterrupted-connectivity guarantee is made.
 
+## Changes in alpha.2
+
+- Removed the extra in-window menu strip and custom window-drag handler.
+- Restored one system-owned title bar; content clicks no longer start window drags.
+- Added an opt-in Linux system tray icon in Settings, disabled by default.
+- With a working tray host, closing hides the window without stopping owned work.
+  Use the icon/menu to reopen, open Settings, or Quit. Without a host, closing
+  exits normally; host loss reopens the window to keep the app reachable.
+- Native X11 pointer navigation, text entry, Save and window-control tests pass.
+  Tray lifecycle tests use a disposable D-Bus host, not a GNOME/KDE desktop.
+
+The tray requires a StatusNotifier/AppIndicator host. GNOME may need an extension.
+It does not replace the normal taskbar entry or add autostart. macOS tray support
+is not included. Wayland and real GNOME/KDE tray rendering remain unvalidated.
+
 ## Choose one edition
 
 - **system**: uses your installed OpenVPN executable.
