@@ -25,7 +25,11 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils dbus-x11 python3-venv
+      - name: Install native review dependencies
+        run: |
+          sudo sed -i -E 's#http://[^ /]+\.ec2\.archive\.ubuntu\.com/ubuntu#https://archive.ubuntu.com/ubuntu#g' /etc/apt/sources.list.d/ubuntu.sources
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 update
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::Retries=2 install -y libxkbcommon-dev libxkbcommon-x11-0 libx11-xcb1 libfontconfig1-dev fonts-dejavu-core xvfb openbox xdotool x11-utils dbus-x11 python3-venv
       - run: python3 -m unittest discover -s packaging/tests -v
       - run: python3 tools/shape_check.py --dups
       - run: cargo fmt --check

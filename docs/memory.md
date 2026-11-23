@@ -288,3 +288,10 @@ output before export finished, producing ENOENT. It now awaits exporting=false
 and retains error/deadline checks. The recorded public CLI sessions completed;
 this failure was in the engine-export validation probe, not evidence of success
 for the unfinished engine-scan/OpenVPN-2.7 checks. Rerun all checks before release.
+
+The corrected 308e9d5 public-relay run passed: 277 engine probes, 42 saved and
+country-resolved relays, verified export bytes, unchanged scan network state,
+and successful CLI public-relay session controls. Four package targets and normal
+Linux/macOS CI passed. Linux desktop-review then stalled repeatedly on an HTTP
+EC2 Ubuntu mirror before tests; use the official HTTPS archive with bounded apt
+network timeouts/retries. This changes runner setup, not application behavior.
