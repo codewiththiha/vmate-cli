@@ -4,7 +4,7 @@ from pathlib import Path
 import base64
 import sys
 
-SCENARIOS = ['about', 'library', 'relay-details', 'setup-bottom', 'empty', 'scanning', 'connection', 'connected', 'setup-linux',
+SCENARIOS = ['connected-library', 'about', 'library', 'relay-details', 'setup-bottom', 'empty', 'scanning', 'connection', 'connected', 'setup-linux',
              'setup-macos', 'missing-openvpn', 'permission-denied', 'activity', 'preferences']
 
 

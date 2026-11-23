@@ -17,7 +17,7 @@ The final pass constrains button widths, pins details actions below an independe
 scrollable body and adds explicit lower-content captures for setup and details.
 Navigation and relay selection have keyboard focus; buttons have focus and disabled
 states. The log starts at the top-left. Setup copy actions retain readable padding.
-There are 28 PNGs: 14 scenarios at 1160×770 and 860×740. A self-contained HTML
+There are 30 PNGs: 15 scenarios at 1160×770 and 860×740. A self-contained HTML
 gallery is generated for visual review. CI uploads captures, gallery and native
 smoke output; a missing state or suspiciously small capture fails the matrix check.
 
@@ -49,3 +49,7 @@ captures and need a Mac review. Unsigned/ad-hoc-signed images are not notarized.
 Slint attribution is present in Help → About. Bundled-library licensing/source
 obligations still require redistribution review.
 Do not call these review artifacts a finished public release or universal VPN proof.
+
+A cross-context regression also checks the relay library while a VPN is connected:
+its scan action is disabled, not mislabeled as Stop scan. Disconnect remains in
+Connections. A UI pointer test guards against starting a scan in that state.

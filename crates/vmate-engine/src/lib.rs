@@ -17,6 +17,11 @@ pub struct Configuration {
 impl Configuration {
     /// Resolve installed application paths without issuing network requests.
     pub fn system() -> Result<Self> {
+        if vmate_core::system::is_root() {
+            bail!(
+                "Run the desktop as your normal user; authorize VPN changes through the system service."
+            );
+        }
         Ok(Self {
             config_dir: vmate_core::paths::config_dir()?,
             database: vmate_core::paths::default_db_path()?,

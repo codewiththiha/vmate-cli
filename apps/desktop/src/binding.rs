@@ -42,6 +42,7 @@ pub(super) fn bind(app: &AppWindow, port: Port) -> slint::Timer {
             if first_ready && !snapshot.events.is_empty() {
                 if snapshot.openvpn.contains("unavailable")
                     || snapshot.system_service.contains("unavailable")
+                    || (snapshot.relays.is_empty() && snapshot.profiles.is_empty())
                 {
                     app.set_page(2);
                 }

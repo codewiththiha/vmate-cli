@@ -93,3 +93,14 @@ passed. At 500 workers, child PSS samples were 683.4–685.4 MiB and teardown to
 175–193 ms. The persisted scan-hangup-results.json now identifies this final run.
 This still measures a local stalled-handshake workload, not 500 full public TLS
 sessions. No evidence justifies increasing the universal default to 500.
+
+### Desktop branch verification (2026-11-21)
+
+- Rust/Slint preview uses a separate engine crate; CLI remains in apps/cli.
+- Local workspace suite: 162 tests; clippy all-target/all-feature warnings denied.
+- Headless software rendering covers 15 scenarios at two sizes (30 PNGs).
+- Xvfb/Openbox native Linux window identity/minimize/maximize/close passed.
+- Linux amd64 debug system/bundled installation packages were validated locally.
+- No measured startup/latency claim; polling is 100ms, not a latency benchmark.
+- No native macOS/Wayland/polkit/egress or signed release validation locally.
+- GitHub desktop matrix started; results must be inspected before acceptance.

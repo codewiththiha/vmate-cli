@@ -9,7 +9,6 @@ export component Connections inherits Rectangle {
     in property <bool> mac;
     in property <string> status;
     in property <string> message;
-    in-out property <int> selected: -1;
     callback connect-profile(int);
     callback cancel;
     callback refresh;
@@ -24,7 +23,7 @@ export component Connections inherits Rectangle {
                     Text { text: root.status; font-size: 30px; font-weight: 600; color: Theme.ink; }
                     Text { text: root.message; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
                 }
-                if root.busy: Action { label: root.connected ? "Disconnect" : "Cancel connection"; clicked => { root.cancel(); } }
+                if root.busy: Action { label: root.connected ? "Disconnect" : "Cancel operation"; clicked => { root.cancel(); } }
             }
         }
         HorizontalBox { SectionTitle { text: root.mac ? "EXISTING VPN APPLICATION" : "NETWORKMANAGER PROFILES"; } Action { label: "Refresh profiles"; enabled: !root.busy; clicked => { root.refresh(); } } }
@@ -54,6 +53,8 @@ export component Connections inherits Rectangle {
 }
 
 export component Setup inherits Rectangle {
+    in property <bool> busy;
+    callback browse-relays;
     in property <bool> review-scroll: false;
     in property <string> openvpn;
     in property <string> service;
@@ -80,12 +81,13 @@ export component Setup inherits Rectangle {
         Text { text: root.mac ? "Install and open Tunnelblick from its official website. Import a relay from vmate, then approve its system authorization prompt. Gatekeeper may require an explicitly approved signed distribution. Do not disable Gatekeeper globally." : "Install the OpenVPN plugin and keep a desktop polkit agent running. Import a relay in the library, then choose its profile in Connections. If authorization is denied, contact your administrator; vmate never installs a blanket sudoers rule."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
         SectionTitle { text: "03 / VERIFY, THEN CONNECT"; }
         Text { text: "Run a scan without sudo. A successful handshake means the relay answered, not that internet traffic or DNS is protected. Connect through your system service and verify your network before relying on it."; font-size: 14px; color: Theme.muted; wrap: word-wrap; }
-        HorizontalBox { Action { label: "Check setup again"; primary: true; clicked => { root.refresh(); } } Rectangle { horizontal-stretch: 1; } }
+        HorizontalBox { Action { label: "Open relay library"; primary: true; clicked => { root.browse-relays(); } } Action { label: "Check setup again"; enabled: !root.busy; clicked => { root.refresh(); } } Rectangle { horizontal-stretch: 1; } }
         Text { text: "Need a terminal-only workflow? vmate-cli remains available. Raw connections require explicit elevation; the graphical app never asks you to run it as root."; font-size: 12px; color: Theme.muted; wrap: word-wrap; }
     } }
 }
 
 export component Preferences inherits Rectangle {
+    in property <bool> busy;
     in-out property <string> workers: "64";
     in-out property <string> timeout: "5";
     in-out property <bool> reduced;
@@ -108,7 +110,7 @@ export component Preferences inherits Rectangle {
         CheckBox { text: "Reduce interface motion"; checked <=> root.reduced; }
         CheckBox { text: "Look up relay countries using ipinfo.io"; checked <=> root.lookup; }
         Text { text: "Off by default. When enabled, relay IP addresses are sent to ipinfo.io.\nNo traffic statistics are invented or sent by this interface."; font-size: 13px; color: Theme.muted; wrap: word-wrap; }
-        HorizontalBox { Action { label: "Save preferences"; primary: true; clicked => { root.save(); } } Rectangle { horizontal-stretch: 1; } }
+        HorizontalBox { Action { label: "Save preferences"; primary: true; enabled: !root.busy; clicked => { root.save(); } } Rectangle { horizontal-stretch: 1; } }
         Rectangle { vertical-stretch: 1; }
     }
 }

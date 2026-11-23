@@ -88,6 +88,17 @@ mod tests {
         );
         click(80.0, 280.0);
         assert_eq!(app.get_page(), 1, "sidebar must navigate to Connections");
+        fixtures::apply(&app, "connected-library");
+        clicked.set(false);
+        app.window().request_redraw();
+        window.draw_if_needed(|renderer| {
+            renderer.render(&mut pixels, 1160);
+        });
+        click(1050.0, 168.0);
+        assert!(
+            !clicked.get(),
+            "library scan must stay disabled during a VPN connection"
+        );
         app.hide().unwrap();
     }
 }

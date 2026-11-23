@@ -66,8 +66,17 @@ jobs:
           python3 packaging/package.py --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --variant bundled --binaries target/release --output packages
       - name: Validate package contents and private executable
         run: python3 tools/package_check.py packages
+      - name: Linux user installer smoke
+        if: runner.os == 'Linux'
+        run: python3 tools/install_smoke.py packages
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}-review
-          path: packages/*
+          path: |
+            packages/*.deb
+            packages/*.tar.gz
+            packages/*.dmg
+            packages/checksums.json
+          compression-level: 0
+          retention-days: 7

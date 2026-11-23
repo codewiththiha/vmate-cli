@@ -4,6 +4,7 @@ use crate::{AppWindow, binding};
 use vmate_engine::model::{Profile, Relay, Snapshot};
 
 pub(super) const SCENARIOS: &[&str] = &[
+    "connected-library",
     "about",
     "library",
     "relay-details",
@@ -87,6 +88,13 @@ pub(super) fn apply(app: &AppWindow, scenario: &str) {
 
 fn select_scenario(app: &AppWindow, scenario: &str, snapshot: &mut Snapshot) {
     match scenario {
+        "connected-library" => {
+            snapshot.busy = true;
+            snapshot.connected = true;
+            snapshot.status = "Connected".into();
+            snapshot.message =
+                "A system VPN session is active. Disconnect in Connections before scanning.".into();
+        }
         "about" => app.set_page(5),
         "relay-details" => app.set_review_scroll(true),
         "setup-bottom" => {

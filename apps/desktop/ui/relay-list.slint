@@ -7,6 +7,7 @@ export component RelayList inherits Rectangle {
     in property <bool> review-scroll: false;
     in-out property <int> selected: -1;
     in property <bool> busy;
+    in property <bool> operation-blocked;
     in-out property <string> query;
     in property <int> completed;
     in property <int> total;
@@ -21,7 +22,7 @@ export component RelayList inherits Rectangle {
                 Text { text: "Find your next connection"; color: Theme.ink; font-size: 27px; font-weight: 600; }
                 Text { text: "Test relays without changing your system network."; color: Theme.muted; font-size: 14px; }
             }
-            Action { label: root.busy ? "Stop scan" : "Scan relays"; primary: true;
+            Action { label: root.busy ? "Stop scan" : "Scan relays"; primary: true; enabled: !root.operation-blocked || root.busy;
                 clicked => { if root.busy { root.cancel(); } else { root.scan(); } }
             }
         }
@@ -73,14 +74,14 @@ export component RelayList inherits Rectangle {
                     Text { text: root.selected >= 0 ? root.rows[root.selected].path : "No relay selected"; color: Theme.muted; font-size: 12px; wrap: char-wrap; }
                     Rectangle { vertical-stretch: 1; }
                     } }
-                    Action { label: "Import into system VPN"; primary: true; enabled: root.selected >= 0 && !root.busy; clicked => { root.import-relay(); } }
-                    Action { label: "Export configuration…"; enabled: root.selected >= 0; clicked => { root.export-relay(); } }
+                    Action { label: "Import into system VPN"; primary: true; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
+                    Action { label: "Export configuration…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
                 }
             }
         }
         if root.width <= 850px: HorizontalBox { spacing: 12px;
-            Action { label: "Import selected relay"; enabled: root.selected >= 0 && !root.busy; clicked => { root.import-relay(); } }
-            Action { label: "Export configuration…"; enabled: root.selected >= 0; clicked => { root.export-relay(); } }
+            Action { label: "Import selected relay"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.import-relay(); } }
+            Action { label: "Export configuration…"; enabled: root.selected >= 0 && !root.operation-blocked; clicked => { root.export-relay(); } }
         }
     }
 }

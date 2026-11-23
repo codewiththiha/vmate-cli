@@ -19,8 +19,10 @@ pub(super) fn bind(app: &AppWindow, port: &Port) {
     let p = port.clone();
     let weak = app.as_weak();
     app.on_connect_profile(move |index| {
-        if let Some(profile) = p.snapshot().profiles.get(index as usize) {
-            send(&p, &weak, Command::Connect(profile.uuid.clone()));
+        if let Some(app) = weak.upgrade()
+            && let Some(profile) = app.get_profiles().row_data(index as usize)
+        {
+            send(&p, &weak, Command::Connect(profile.uuid.to_string()));
         }
     });
     relay_actions(app, port);

@@ -1,6 +1,6 @@
 {
   "rust_tests": 162,
-  "headless_scenarios": 14,
+  "headless_scenarios": 15,
   "sizes": [
     [
       1160,
@@ -11,7 +11,7 @@
       740
     ]
   ],
-  "headless_images": 28,
+  "headless_images": 30,
   "native_linux": {
     "window_class": "vmate",
     "taskbar_identity": "passed",

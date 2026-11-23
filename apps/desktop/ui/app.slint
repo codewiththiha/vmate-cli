@@ -106,7 +106,7 @@ export component AppWindow inherits Window {
                         Text { text: root.diagnostic; color: #773b21; font-size: 13px; wrap: word-wrap; }
                     }
                 }
-                if root.page == 0: RelayList { review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy;
+                if root.page == 0: RelayList { review-scroll: root.review-scroll; query <=> root.query; rows: root.relays; selected <=> root.selected; busy: root.busy && root.status == "Scanning"; operation-blocked: root.busy;
                     completed: root.completed; total: root.total;
                     scan => { root.scan(); } cancel => { root.cancel(); }
                     import-relay => { root.import-relay(); } export-relay => { root.export-relay(); }
@@ -116,7 +116,7 @@ export component AppWindow inherits Window {
                     connect-profile(index) => { root.connect-profile(index); }
                     cancel => { root.cancel(); } refresh => { root.refresh(); } setup => { root.page = 2; }
                 }
-                if root.page == 2: Setup { review-scroll: root.review-scroll; openvpn: root.openvpn; service: root.service; mac: root.mac;
+                if root.page == 2: Setup { busy: root.busy; browse-relays => { root.page = 0; } review-scroll: root.review-scroll; openvpn: root.openvpn; service: root.service; mac: root.mac;
                     install-command: root.install-command;
                     refresh => { root.refresh(); } copy-command => { root.copy-command(); }
                 }
@@ -146,7 +146,7 @@ export component AppWindow inherits Window {
                         Rectangle { vertical-stretch: 1; }
                     }
                 }
-                if root.page == 4: Preferences { workers <=> root.workers; timeout <=> root.timeout; reduced <=> root.reduced; lookup <=> root.lookup; save => { root.save(); } }
+                if root.page == 4: Preferences { busy: root.busy; workers <=> root.workers; timeout <=> root.timeout; reduced <=> root.reduced; lookup <=> root.lookup; save => { root.save(); } }
                 Rule {}
                 Rectangle { height: 45px; background: Theme.surface;
                     Text { x: 24px; width: parent.width - 48px; height: parent.height; text: root.message; color: Theme.muted; font-size: 12px; overflow: elide; vertical-alignment: center; }
