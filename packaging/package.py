@@ -40,7 +40,7 @@ def linux(args, stage):
     package = 'vmate-bundled' if args.variant == 'bundled' else 'vmate'
     conflict = 'vmate' if args.variant == 'bundled' else 'vmate-bundled'
     control.write_text(f'''Package: {package}
-Version: {args.version}
+Version: {args.version}-{native.RELEASE}
 Architecture: {args.arch}
 Maintainer: codewiththiha <kt0071@gmail.com>
 Conflicts: {conflict}

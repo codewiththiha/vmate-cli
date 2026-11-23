@@ -29,6 +29,7 @@ class NativeMetadata(unittest.TestCase):
                 self.assertEqual('depend = openvpn\n' in info, variant == 'system')
                 self.assertIn('conflict = vmate', info)
                 self.assertIn('depend = ttf-dejavu', info)
+                self.assertIn('pkgver = 1.2.4-2', info)
                 if variant == 'bundled':
                     self.assertIn('pkgname = vmate-bundled', info)
                 listing = subprocess.check_output(['bsdtar', '-tvf', str(package)], text=True)
@@ -52,6 +53,8 @@ class NativeMetadata(unittest.TestCase):
             self.assertNotIn('wayland-libs-client', result)
             name = subprocess.check_output(['rpm', '-qp', '--queryformat', '%{NAME}', str(package)], text=True)
             self.assertEqual(name, 'vmate-bundled')
+            release = subprocess.check_output(['rpm', '-qp', '--queryformat', '%{RELEASE}', str(package)], text=True)
+            self.assertEqual(release, '0.2.desktop')
 
 
 if __name__ == '__main__':

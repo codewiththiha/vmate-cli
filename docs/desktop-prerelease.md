@@ -7,6 +7,7 @@ kill-switch, or uninterrupted-connectivity guarantee is made.
 ## Changes in alpha.2
 
 - Removed the extra in-window menu strip and custom window-drag handler.
+- Linux native package revisions increase so package managers upgrade alpha.1.
 - Restored one system-owned title bar; content clicks no longer start window drags.
 - Added an opt-in Linux system tray icon in Settings, disabled by default.
 - With a working tray host, closing hides the window without stopping owned work.

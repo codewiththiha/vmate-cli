@@ -7,6 +7,8 @@ import tarfile
 import tempfile
 import time
 
+RELEASE = 2
+
 
 def root_owner(entry):
     entry.uid = entry.gid = 0
@@ -21,7 +23,7 @@ def arch(args, stage):
     if args.variant == 'system':
         dependencies.append('openvpn')
     name = 'vmate-bundled' if args.variant == 'bundled' else 'vmate'
-    lines = [f'pkgname = {name}', 'pkgbase = vmate', f'pkgver = {args.version}-1',
+    lines = [f'pkgname = {name}', 'pkgbase = vmate', f'pkgver = {args.version}-{RELEASE}',
              'pkgdesc = Experimental native OpenVPN relay desktop and CLI',
              'url = https://github.com/codewiththiha/vmate-cli',
              f'builddate = {int(os.environ.get("SOURCE_DATE_EPOCH", time.time()))}',
@@ -60,7 +62,7 @@ def rpm(args, stage):
         conflict = 'vmate' if args.variant == 'bundled' else 'vmate-bundled'
         specification.write_text(f'''Name: {name}
 Version: {args.version}
-Release: 0.1.desktop
+Release: 0.{RELEASE}.desktop
 Summary: Experimental native OpenVPN relay desktop and CLI
 License: MIT AND LicenseRef-Slint-Royalty-free-2.0
 URL: https://github.com/codewiththiha/vmate-cli
